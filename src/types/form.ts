@@ -14,13 +14,18 @@ export interface FormData {
   // Step 2: Medical Visit
   firstVisitDate: string;
   secondVisitDays: number | '';
+  serviceEntries: ServiceEntry[];
+  
+  // Step 3: Notes
+  notes: string;
+}
+
+export interface ServiceEntry {
+  id: string;
   serviceName: string;
   serviceType: string;
   price: number | '';
   quantity: number | '';
-  
-  // Step 3: Notes
-  notes: string;
 }
 
 export interface FormErrors {

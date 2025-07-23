@@ -68,71 +68,14 @@ export const generatePDF = async (formData: FormData): Promise<void> => {
   ]);
   
   // Step 2: Medical Visit
-  const visitFields = [
+  addSection('Medical Visit Information', [
     { label: 'First Visit Date', value: formData.firstVisitDate },
-    { label: 'Second Visit Days', value: formData.secondVisitDays.toString() }
-  ];
-  
-  addSection('Medical Visit Information', visitFields);
-  
-  // Service Entries
-  if (formData.serviceEntries.length > 0) {
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(16);
-    pdf.setTextColor(51, 51, 51);
-    pdf.text('Service Entries', 20, yPosition);
-    yPosition += 10;
-    
-    // Table header
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(10);
-    pdf.setTextColor(68, 68, 68);
-    
-    const tableStartY = yPosition;
-    const colWidths = [40, 40, 30, 30, 30];
-    const colPositions = [20, 60, 100, 130, 160];
-    
-    // Draw header
-    pdf.text('Service Name', colPositions[0], yPosition);
-    pdf.text('Service Type', colPositions[1], yPosition);
-    pdf.text('Price', colPositions[2], yPosition);
-    pdf.text('Quantity', colPositions[3], yPosition);
-    pdf.text('Total', colPositions[4], yPosition);
-    
-    yPosition += 8;
-    
-    // Draw header line
-    pdf.setLineWidth(0.3);
-    pdf.line(20, yPosition - 2, pageWidth - 20, yPosition - 2);
-    
-    // Table rows
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(9);
-    
-    formData.serviceEntries.forEach((entry, index) => {
-      if (yPosition > pageHeight - 30) {
-        pdf.addPage();
-        yPosition = 20;
-      }
-      
-      const serviceName = entry.serviceName || '-';
-      const serviceType = entry.serviceType || '-';
-      const price = entry.price ? `${entry.price} ${formData.currency}` : '-';
-      const quantity = entry.quantity || '-';
-      const total = (entry.price && entry.quantity) ? 
-        `${(Number(entry.price) * Number(entry.quantity))} ${formData.currency}` : '-';
-      
-      pdf.text(serviceName, colPositions[0], yPosition);
-      pdf.text(serviceType, colPositions[1], yPosition);
-      pdf.text(price, colPositions[2], yPosition);
-      pdf.text(quantity.toString(), colPositions[3], yPosition);
-      pdf.text(total, colPositions[4], yPosition);
-      
-      yPosition += 6;
-    });
-    
-    yPosition += 8;
-  }
+    { label: 'Second Visit Days', value: formData.secondVisitDays.toString() },
+    { label: 'Service Name', value: formData.serviceName },
+    { label: 'Service Type', value: formData.serviceType },
+    { label: 'Price', value: `${formData.price} ${formData.currency}` },
+    { label: 'Quantity', value: formData.quantity.toString() }
+  ]);
   
   // Step 3: Notes
   if (formData.notes) {

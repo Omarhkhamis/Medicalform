@@ -30,10 +30,7 @@ const MultiStepForm: React.FC = () => {
     // Step 2
     firstVisitDate: '',
     secondVisitDays: '',
-    serviceName: '',
-    serviceType: '',
-    price: '',
-    quantity: '',
+    serviceEntries: [],
     
     // Step 3
     notes: ''
@@ -77,10 +74,6 @@ const MultiStepForm: React.FC = () => {
     if (step === 2) {
       if (!formData.firstVisitDate) newErrors.firstVisitDate = 'First visit date is required';
       if (!formData.secondVisitDays) newErrors.secondVisitDays = 'Second visit days is required';
-      if (!formData.serviceName) newErrors.serviceName = 'Service name is required';
-      if (!formData.serviceType.trim()) newErrors.serviceType = 'Service type is required';
-      if (!formData.price) newErrors.price = 'Price is required';
-      if (!formData.quantity) newErrors.quantity = 'Quantity is required';
     }
     
     return newErrors;
