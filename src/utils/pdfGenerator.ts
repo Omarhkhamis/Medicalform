@@ -1,155 +1,122 @@
-import jsPDF from 'jspdf';
-import { FormData } from '../types/form';
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import { FormData } from "../types/form";
+
+// استورد الخط بصيغة base64 (مثال للخط Amiri)
+import amiriFont from "../fonts/Amiri-Regular-normal.js"; // هذا ملف يحتوي على الخط بصيغة base64
 
 export const generatePDF = async (formData: FormData): Promise<void> => {
-  const pdf = new jsPDF('p', 'mm', 'a4');
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  
-  // Set up fonts
-  pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(20);
-  
-  // Title
-  const title = 'Medical Form Report';
-  const titleWidth = pdf.getTextWidth(title);
-  pdf.text(title, (pageWidth - titleWidth) / 2, 25);
-  
-  // Add horizontal line
-  pdf.setLineWidth(0.5);
-  pdf.line(20, 30, pageWidth - 20, 30);
-  
-  let yPosition = 45;
-  
-  // Helper function to add section
-  const addSection = (sectionTitle: string, fields: Array<{label: string, value: string | number}>) => {
-    // Section title
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(16);
-    pdf.setTextColor(51, 51, 51);
-    pdf.text(sectionTitle, 20, yPosition);
-    yPosition += 10;
-    
-    // Section content
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(11);
-    pdf.setTextColor(68, 68, 68);
-    
-    fields.forEach(field => {
-      if (field.value) {
-        const text = `${field.label}: ${field.value}`;
-        const lines = pdf.splitTextToSize(text, pageWidth - 40);
-        pdf.text(lines, 25, yPosition);
-        yPosition += lines.length * 5;
-      }
-    });
-    
-    yPosition += 8;
-    
-    // Check if we need a new page
-    if (yPosition > pageHeight - 20) {
-      pdf.addPage();
-      yPosition = 20;
-    }
-  };
-  
-  // Step 1: Personal Information
-  addSection('Personal Information', [
-    { label: 'Consultant Name', value: formData.consultantName },
-    { label: 'Patient Name', value: formData.patientName },
-    { label: 'Phone Number', value: formData.phoneNumber },
-    { label: 'Patient ID', value: formData.patientId },
-    { label: 'Entry Date', value: formData.entryDate },
-    { label: 'Age', value: formData.age.toString() },
-    { label: 'Currency', value: formData.currency },
-    { label: 'Language', value: formData.language },
-    { label: 'Health Condition', value: formData.healthCondition },
-    { label: 'Services', value: formData.services }
-  ]);
-  
-  // Step 2: Medical Visit
-  const visitFields = [
-    { label: 'First Visit Date', value: formData.firstVisitDate },
-    { label: 'Second Visit Days', value: formData.secondVisitDays.toString() }
+  const doc = new jsPDF("p", "mm", "a4");
+
+  // إضافة الخط العربي
+  doc.addFileToVFS("Amiri-Regular.ttf", amiriFont);
+  doc.addFont("Amiri-Regular.ttf", "Amiri", "normal");
+  doc.setFont("Amiri");
+  doc.setFontSize(12);
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  // -------- العنوان الرئيسي --------
+  doc.setFontSize(16);
+  doc.text("قسم الإستشارات الطبية", pageWidth / 2, 15, { align: "center" });
+
+  // -------- معلومات الطبيب والمريض --------
+  const infoStartY = 25;
+  const infoLines = [
+    `اسم المستشار الطبي: ${formData.consultantName}`,
+    `اسم المريض: ${formData.patientName}`,
+    `العمر: ${formData.age}     التاريخ: ${formData.entryDate}`,
+    `الرقم التعريفي: ${formData.patientId}`,
+    `الحالة الصحية: ${formData.healthCondition}`,
   ];
-  
-  addSection('Medical Visit Information', visitFields);
-  
-  // Service Entries
-  if (formData.serviceEntries.length > 0) {
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(16);
-    pdf.setTextColor(51, 51, 51);
-    pdf.text('Service Entries', 20, yPosition);
-    yPosition += 10;
-    
-    // Table header
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(10);
-    pdf.setTextColor(68, 68, 68);
-    
-    const tableStartY = yPosition;
-    const colWidths = [40, 40, 30, 30, 30];
-    const colPositions = [20, 60, 100, 130, 160];
-    
-    // Draw header
-    pdf.text('Service Name', colPositions[0], yPosition);
-    pdf.text('Service Type', colPositions[1], yPosition);
-    pdf.text('Price', colPositions[2], yPosition);
-    pdf.text('Quantity', colPositions[3], yPosition);
-    pdf.text('Total', colPositions[4], yPosition);
-    
-    yPosition += 8;
-    
-    // Draw header line
-    pdf.setLineWidth(0.3);
-    pdf.line(20, yPosition - 2, pageWidth - 20, yPosition - 2);
-    
-    // Table rows
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(9);
-    
-    formData.serviceEntries.forEach((entry, index) => {
-      if (yPosition > pageHeight - 30) {
-        pdf.addPage();
-        yPosition = 20;
-      }
-      
-      const serviceName = entry.serviceName || '-';
-      const serviceType = entry.serviceType || '-';
-      const price = entry.price ? `${entry.price} ${formData.currency}` : '-';
-      const quantity = entry.quantity || '-';
-      const total = (entry.price && entry.quantity) ? 
-        `${(Number(entry.price) * Number(entry.quantity))} ${formData.currency}` : '-';
-      
-      pdf.text(serviceName, colPositions[0], yPosition);
-      pdf.text(serviceType, colPositions[1], yPosition);
-      pdf.text(price, colPositions[2], yPosition);
-      pdf.text(quantity.toString(), colPositions[3], yPosition);
-      pdf.text(total, colPositions[4], yPosition);
-      
-      yPosition += 6;
-    });
-    
-    yPosition += 8;
-  }
-  
-  // Step 3: Notes
-  if (formData.notes) {
-    addSection('Additional Notes', [
-      { label: 'Notes', value: formData.notes }
-    ]);
-  }
-  
-  // Add footer
-  pdf.setFont('helvetica', 'italic');
-  pdf.setFontSize(8);
-  pdf.setTextColor(128, 128, 128);
-  const footer = `Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`;
-  const footerWidth = pdf.getTextWidth(footer);
-  pdf.text(footer, (pageWidth - footerWidth) / 2, pageHeight - 10);
-  
-  // Save the PDF
-  const fileName = `medical_form_${formData.patientName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
-  pdf.save(fileName);
+
+  infoLines.forEach((line, i) => {
+    doc.text(line, 190, infoStartY + i * 8, { align: "right" });
+  });
+
+  // -------- جدول الزيارة الأولى --------
+  let currentY = infoStartY + infoLines.length * 8 + 10;
+  doc.setFontSize(14);
+  doc.text("الزيارة الأولى:", 190, currentY, { align: "right" });
+
+  currentY += 5;
+
+  autoTable(doc, {
+    startY: currentY,
+    head: [["الصنف", "المنشأ", "السعر", "العدد", "المجموع"]],
+    body: [
+      [
+        formData.firstVisit.serviceType,
+        formData.firstVisit.serviceName,
+        formData.firstVisit.price,
+        formData.firstVisit.quantity,
+        formData.firstVisit.price * formData.firstVisit.quantity,
+      ],
+    ],
+    styles: {
+      font: "Amiri",
+      halign: "right",
+    },
+    headStyles: { fillColor: [240, 240, 240] },
+  });
+
+  // -------- ملاحظة بين الزيارات --------
+  currentY = (doc as any).lastAutoTable.finalY + 10;
+  doc.setFontSize(11);
+  doc.text(
+    "ستكون الزيارة بعد ٤ إلى ٦ أشهر لاستكمال العلاج ووضع التيجان على الزرعات.",
+    190,
+    currentY,
+    { align: "right" }
+  );
+
+  // -------- جدول الزيارة الثانية --------
+  currentY += 10;
+  doc.setFontSize(14);
+  doc.text("الزيارة الثانية:", 190, currentY, { align: "right" });
+
+  currentY += 5;
+
+  autoTable(doc, {
+    startY: currentY,
+    head: [["الصنف", "المنشأ", "السعر", "العدد", "المجموع"]],
+    body: [
+      [
+        formData.secondVisit.serviceType,
+        formData.secondVisit.serviceName,
+        formData.secondVisit.price,
+        formData.secondVisit.quantity,
+        formData.secondVisit.price * formData.secondVisit.quantity,
+      ],
+    ],
+    styles: {
+      font: "Amiri",
+      halign: "right",
+    },
+    headStyles: { fillColor: [240, 240, 240] },
+  });
+
+  // -------- التكلفة النهائية --------
+  const totalCost =
+    formData.firstVisit.price * formData.firstVisit.quantity +
+    formData.secondVisit.price * formData.secondVisit.quantity;
+
+  currentY = (doc as any).lastAutoTable.finalY + 10;
+  doc.setFontSize(13);
+  doc.setFont("Amiri", "bold");
+  doc.text(`التكلفة النهائية: $${totalCost}`, 190, currentY, {
+    align: "right",
+  });
+
+  // -------- التذييل --------
+  doc.setFontSize(8);
+  doc.setFont("Amiri", "italic");
+  const footer = `تم التوليد بتاريخ ${new Date().toLocaleDateString()} الساعة ${new Date().toLocaleTimeString()}`;
+  doc.text(footer, pageWidth / 2, 290, { align: "center" });
+
+  // -------- الحفظ --------
+  const fileName = `تقرير_${formData.patientName.replace(/\s+/g, "_")}_${
+    new Date().toISOString().split("T")[0]
+  }.pdf`;
+  doc.save(fileName);
 };
