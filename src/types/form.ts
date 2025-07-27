@@ -24,7 +24,8 @@ export interface FormData {
   };
   
   // Step 3: Notes
-  uploadedImage: File | null;
+  uploadedImages: File[];
+  externalLink: string;
   notes: string;
 }
 
@@ -43,7 +44,7 @@ export interface FormErrors {
 export interface StepProps {
   formData: FormData;
   errors: FormErrors;
-  onChange: (field: keyof FormData, value: string | number) => void;
+  onChange: (field: keyof FormData, value: string | number | File[]) => void;
   onBlur: (field: keyof FormData) => void;
   onValidate: () => boolean;
 }

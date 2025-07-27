@@ -40,18 +40,15 @@ const MultiStepForm: React.FC = () => {
     },
     
     // Step 3
-    uploadedImage: null,
+    uploadedImages: [],
+    externalLink: '',
     notes: ''
   });
   
   const [errors, setErrors] = useState<FormErrors>({});
 
   const handleFieldChange = (field: keyof FormData, value: string | number) => {
-    if (field === 'uploadedImage') {
-      setFormData(prev => ({ ...prev, [field]: value as File | null }));
-    } else {
-      setFormData(prev => ({ ...prev, [field]: value }));
-    }
+    setFormData(prev => ({ ...prev, [field]: value }));
     // Clear error when user starts typing if field has been touched or submit attempted
     if (errors[field] && (touchedFields.has(field) || hasAttemptedSubmit)) {
       setErrors(prev => ({ ...prev, [field]: '' }));

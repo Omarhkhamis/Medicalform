@@ -157,30 +157,22 @@ export const generatePDF = async (formData: FormData): Promise<void> => {
   }
   
   // Add uploaded image if exists
-  if (formData.uploadedImage) {
-    try {
-      const imageBase64 = await convertImageToBase64(formData.uploadedImage);
-      const imageFormat = formData.uploadedImage.type.includes('png') ? 'PNG' : 'JPEG';
-      
-      // Check if we need a new page
-      if (yPosition > pageHeight - 80) {
-        pdf.addPage();
-        yPosition = 20;
-      }
-      
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(16);
-      pdf.text('Uploaded Image', 20, yPosition);
-      yPosition += 15;
-      
-      // Add image (max width: 150mm, max height: 100mm)
-      const imgWidth = 150;
-      const imgHeight = 100;
-      pdf.addImage(imageBase64, imageFormat, 20, yPosition, imgWidth, imgHeight);
-      yPosition += imgHeight + 15;
-    } catch (error) {
-      console.error('Error adding image to PDF:', error);
+  if (formData.externalLink) {
+    addSection('External Link', [
+      { label: 'Link', value: formData.externalLink }
+    ]);
+    
+    // Add clickable link
+    if (yPosition > pageHeight - 20) {
+      pdf.addPage();
+      yPosition = 20;
     }
+    
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(11);
+    pdf.setTextColor(0, 0, 255); // Blue color for link
+    pdf.textWithLink('Click here to visit the external link', 25, yPosition, { url: formData.externalLink });
+    yPosition += 15;
   }
   
   // Step 3: Notes
@@ -188,6 +180,66 @@ export const generatePDF = async (formData: FormData): Promise<void> => {
     addSection('Additional Notes', [
       { label: 'Notes', value: formData.notes }
     ]);
+  }
+  
+  // Add uploaded images if they exist
+  if (formData.uploadedImages && formData.uploadedImages.length > 0) {
+    try {
+      for (let i = 0; i < formData.uploadedImages.length; i++) {
+        const image = formData.uploadedImages[i];
+        const imageBase64 = await convertImageToBase64(image);
+        const imageFormat = image.type.includes('png') ? 'PNG' : 'JPEG';
+        
+        // Check if we need a new page
+        if (yPosition > pageHeight - 120) {
+          pdf.addPage();
+          yPosition = 20;
+        }
+        
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(16);
+        pdf.text(`Uploaded Image ${i + 1}`, 20, yPosition);
+        yPosition += 15;
+        
+        // Calculate image dimensions to fit page width while preserving aspect ratio
+        const maxWidth = pageWidth - 40; // 20mm margin on each side
+        const maxHeight = 100; // Maximum height
+        
+        // Create a temporary image to get dimensions
+        const tempImg = new Image();
+        tempImg.src = imageBase64;
+        
+        // Use default dimensions if we can't get actual dimensions
+        let imgWidth = maxWidth;
+        let imgHeight = maxHeight;
+        
+        // Calculate aspect ratio and resize
+        if (tempImg.naturalWidth && tempImg.naturalHeight) {
+          const aspectRatio = tempImg.naturalWidth / tempImg.naturalHeight;
+          
+          if (aspectRatio > 1) {
+            // Landscape
+            imgWidth = Math.min(maxWidth, maxWidth);
+            imgHeight = imgWidth / aspectRatio;
+          } else {
+            // Portrait
+            imgHeight = Math.min(maxHeight, maxHeight);
+            imgWidth = imgHeight * aspectRatio;
+          }
+        }
+        
+        // Ensure image fits on current page
+        if (yPosition + imgHeight > pageHeight - 20) {
+          pdf.addPage();
+          yPosition = 20;
+        }
+        
+        pdf.addImage(imageBase64, imageFormat, 20, yPosition, imgWidth, imgHeight);
+        yPosition += imgHeight + 15;
+      }
+    } catch (error) {
+      console.error('Error adding images to PDF:', error);
+    }
   }
   
   // Add footer
