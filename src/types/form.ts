@@ -12,11 +12,19 @@ export interface FormData {
   services: string;
   
   // Step 2: Medical Visit
-  firstVisitDate: string;
-  secondVisitDays: number | '';
-  serviceEntries: ServiceEntry[];
+  firstVisit: {
+    visitDate: string;
+    visitDays: number | '';
+    serviceEntries: ServiceEntry[];
+  };
+  secondVisit: {
+    visitDate: string;
+    visitDays: number | '';
+    serviceEntries: ServiceEntry[];
+  };
   
   // Step 3: Notes
+  uploadedImage: File | null;
   notes: string;
 }
 

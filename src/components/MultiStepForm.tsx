@@ -28,18 +28,30 @@ const MultiStepForm: React.FC = () => {
     services: '',
     
     // Step 2
-    firstVisitDate: '',
-    secondVisitDays: '',
-    serviceEntries: [],
+    firstVisit: {
+      visitDate: '',
+      visitDays: '',
+      serviceEntries: []
+    },
+    secondVisit: {
+      visitDate: '',
+      visitDays: '',
+      serviceEntries: []
+    },
     
     // Step 3
+    uploadedImage: null,
     notes: ''
   });
   
   const [errors, setErrors] = useState<FormErrors>({});
 
   const handleFieldChange = (field: keyof FormData, value: string | number) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    if (field === 'uploadedImage') {
+      setFormData(prev => ({ ...prev, [field]: value as File | null }));
+    } else {
+      setFormData(prev => ({ ...prev, [field]: value }));
+    }
     // Clear error when user starts typing if field has been touched or submit attempted
     if (errors[field] && (touchedFields.has(field) || hasAttemptedSubmit)) {
       setErrors(prev => ({ ...prev, [field]: '' }));
@@ -72,8 +84,10 @@ const MultiStepForm: React.FC = () => {
     }
     
     if (step === 2) {
-      if (!formData.firstVisitDate) newErrors.firstVisitDate = 'First visit date is required';
-      if (!formData.secondVisitDays) newErrors.secondVisitDays = 'Second visit days is required';
+      if (!formData.firstVisit.visitDate) newErrors.firstVisitDate = 'First visit date is required';
+      if (!formData.firstVisit.visitDays) newErrors.firstVisitDays = 'First visit days is required';
+      if (!formData.secondVisit.visitDate) newErrors.secondVisitDate = 'Second visit date is required';
+      if (!formData.secondVisit.visitDays) newErrors.secondVisitDays = 'Second visit days is required';
     }
     
     return newErrors;

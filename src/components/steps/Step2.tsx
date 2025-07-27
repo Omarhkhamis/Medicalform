@@ -4,7 +4,14 @@ import FormInput from '../FormInput';
 import { Plus, X } from 'lucide-react';
 
 const Step2: React.FC<StepProps> = ({ formData, errors, onChange, onBlur }) => {
-  const [currentEntry, setCurrentEntry] = useState({
+  const [firstVisitEntry, setFirstVisitEntry] = useState({
+    serviceName: '',
+    serviceType: '',
+    price: '' as number | '',
+    quantity: '' as number | ''
+  });
+
+  const [secondVisitEntry, setSecondVisitEntry] = useState({
     serviceName: '',
     serviceType: '',
     price: '' as number | '',
@@ -17,28 +24,53 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange, onBlur }) => {
     { value: 'option3', label: 'Option 3' }
   ];
 
-  const handleCurrentEntryChange = (field: string, value: string | number) => {
-    setCurrentEntry(prev => ({ ...prev, [field]: value }));
+  const handleFirstVisitChange = (field: string, value: string | number) => {
+    if (field === 'visitDate') {
+      const updatedFirstVisit = { ...formData.firstVisit, visitDate: value as string };
+      onChange('firstVisit', updatedFirstVisit as any);
+    } else if (field === 'visitDays') {
+      const updatedFirstVisit = { ...formData.firstVisit, visitDays: value as number };
+      onChange('firstVisit', updatedFirstVisit as any);
+    }
   };
 
-  const handleAddEntry = () => {
-    // Check if at least one field is filled
-    const hasData = currentEntry.serviceName || 
-                   currentEntry.serviceType || 
-                   currentEntry.price !== '' || 
-                   currentEntry.quantity !== '';
+  const handleSecondVisitChange = (field: string, value: string | number) => {
+    if (field === 'visitDate') {
+      const updatedSecondVisit = { ...formData.secondVisit, visitDate: value as string };
+      onChange('secondVisit', updatedSecondVisit as any);
+    } else if (field === 'visitDays') {
+      const updatedSecondVisit = { ...formData.secondVisit, visitDays: value as number };
+      onChange('secondVisit', updatedSecondVisit as any);
+    }
+  };
+
+  const handleFirstVisitEntryChange = (field: string, value: string | number) => {
+    setFirstVisitEntry(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSecondVisitEntryChange = (field: string, value: string | number) => {
+    setSecondVisitEntry(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleAddFirstVisitEntry = () => {
+    const hasData = firstVisitEntry.serviceName || 
+                   firstVisitEntry.serviceType || 
+                   firstVisitEntry.price !== '' || 
+                   firstVisitEntry.quantity !== '';
 
     if (hasData) {
       const newEntry: ServiceEntry = {
         id: Date.now().toString(),
-        ...currentEntry
+        ...firstVisitEntry
       };
 
-      const updatedEntries = [...formData.serviceEntries, newEntry];
-      onChange('serviceEntries', updatedEntries as any);
+      const updatedFirstVisit = {
+        ...formData.firstVisit,
+        serviceEntries: [...formData.firstVisit.serviceEntries, newEntry]
+      };
+      onChange('firstVisit', updatedFirstVisit as any);
 
-      // Clear the form
-      setCurrentEntry({
+      setFirstVisitEntry({
         serviceName: '',
         serviceType: '',
         price: '',
@@ -47,9 +79,47 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange, onBlur }) => {
     }
   };
 
-  const handleRemoveEntry = (id: string) => {
-    const updatedEntries = formData.serviceEntries.filter(entry => entry.id !== id);
-    onChange('serviceEntries', updatedEntries as any);
+  const handleAddSecondVisitEntry = () => {
+    const hasData = secondVisitEntry.serviceName || 
+                   secondVisitEntry.serviceType || 
+                   secondVisitEntry.price !== '' || 
+                   secondVisitEntry.quantity !== '';
+
+    if (hasData) {
+      const newEntry: ServiceEntry = {
+        id: Date.now().toString(),
+        ...secondVisitEntry
+      };
+
+      const updatedSecondVisit = {
+        ...formData.secondVisit,
+        serviceEntries: [...formData.secondVisit.serviceEntries, newEntry]
+      };
+      onChange('secondVisit', updatedSecondVisit as any);
+
+      setSecondVisitEntry({
+        serviceName: '',
+        serviceType: '',
+        price: '',
+        quantity: ''
+      });
+    }
+  };
+
+  const handleRemoveFirstVisitEntry = (id: string) => {
+    const updatedFirstVisit = {
+      ...formData.firstVisit,
+      serviceEntries: formData.firstVisit.serviceEntries.filter(entry => entry.id !== id)
+    };
+    onChange('firstVisit', updatedFirstVisit as any);
+  };
+
+  const handleRemoveSecondVisitEntry = (id: string) => {
+    const updatedSecondVisit = {
+      ...formData.secondVisit,
+      serviceEntries: formData.secondVisit.serviceEntries.filter(entry => entry.id !== id)
+    };
+    onChange('secondVisit', updatedSecondVisit as any);
   };
 
   const formatPrice = (price: number | '', currency: string) => {
@@ -57,48 +127,52 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange, onBlur }) => {
     return `${price} ${currency}`;
   };
 
-  return (
-    <div className="space-y-8">
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">Medical Visit</h2>
-        <p className="text-gray-600">Please provide medical visit details and service information</p>
-      </div>
-
-      {/* Row 1: Visit dates */}
+  const renderVisitSection = (
+    title: string,
+    visitData: { visitDate: string; visitDays: number | ''; serviceEntries: ServiceEntry[] },
+    currentEntry: { serviceName: string; serviceType: string; price: number | ''; quantity: number | '' },
+    onVisitChange: (field: string, value: string | number) => void,
+    onEntryChange: (field: string, value: string | number) => void,
+    onAddEntry: () => void,
+    onRemoveEntry: (id: string) => void,
+    visitDateError?: string,
+    visitDaysError?: string
+  ) => (
+    <div className="space-y-6">
+      <h3 className="text-xl font-semibold text-gray-800 border-b border-gray-200 pb-2">{title}</h3>
+      
+      {/* Visit Information */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <FormInput
-          label="First Visit Date"
+          label="Visit Date"
           type="date"
-          value={formData.firstVisitDate}
-          onChange={(value) => onChange('firstVisitDate', value)}
-          onBlur={() => onBlur('firstVisitDate')}
-          error={errors.firstVisitDate}
+          value={visitData.visitDate}
+          onChange={(value) => onVisitChange('visitDate', value)}
+          error={visitDateError}
           required
         />
 
         <FormInput
-          label="Second Visit Days"
+          label="Visit Days"
           type="number"
-          value={formData.secondVisitDays}
-          onChange={(value) => onChange('secondVisitDays', value)}
-          onBlur={() => onBlur('secondVisitDays')}
-          error={errors.secondVisitDays}
+          value={visitData.visitDays}
+          onChange={(value) => onVisitChange('visitDays', value)}
+          error={visitDaysError}
           required
-          placeholder="Days until second visit"
+          placeholder="Days until visit"
         />
       </div>
 
       {/* Service Entry Form */}
       <div className="bg-gray-50 rounded-lg p-6 space-y-6">
-        <h3 className="text-lg font-semibold text-gray-800">Add Service Entry</h3>
+        <h4 className="text-lg font-medium text-gray-800">Add Service Entry</h4>
         
-        {/* Row 2: Service details */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormInput
             label="Service Name"
             type="select"
             value={currentEntry.serviceName}
-            onChange={(value) => handleCurrentEntryChange('serviceName', value)}
+            onChange={(value) => onEntryChange('serviceName', value)}
             options={serviceNameOptions}
             placeholder="Select service"
           />
@@ -106,18 +180,17 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange, onBlur }) => {
           <FormInput
             label="Service Type"
             value={currentEntry.serviceType}
-            onChange={(value) => handleCurrentEntryChange('serviceType', value)}
+            onChange={(value) => onEntryChange('serviceType', value)}
             placeholder="Enter service type"
           />
         </div>
 
-        {/* Row 3: Price and quantity */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormInput
             label="Price"
             type="number"
             value={currentEntry.price}
-            onChange={(value) => handleCurrentEntryChange('price', value)}
+            onChange={(value) => onEntryChange('price', value)}
             placeholder="Enter price"
           />
 
@@ -125,16 +198,15 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange, onBlur }) => {
             label="Quantity"
             type="number"
             value={currentEntry.quantity}
-            onChange={(value) => handleCurrentEntryChange('quantity', value)}
+            onChange={(value) => onEntryChange('quantity', value)}
             placeholder="Enter quantity"
           />
         </div>
 
-        {/* Add button */}
         <div className="flex justify-end">
           <button
             type="button"
-            onClick={handleAddEntry}
+            onClick={onAddEntry}
             className="flex items-center gap-2 px-6 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-all duration-200 hover:shadow-lg hover:shadow-blue-200"
           >
             <Plus size={20} />
@@ -144,12 +216,11 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange, onBlur }) => {
       </div>
 
       {/* Service Entries List */}
-      {formData.serviceEntries.length > 0 && (
+      {visitData.serviceEntries.length > 0 && (
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-800">Service Entries</h3>
+          <h4 className="text-lg font-medium text-gray-800">Service Entries</h4>
           
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-            {/* Table Header */}
             <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
               <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
                 <div className="col-span-3">Service Name</div>
@@ -160,9 +231,8 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange, onBlur }) => {
               </div>
             </div>
 
-            {/* Table Body */}
             <div className="divide-y divide-gray-200">
-              {formData.serviceEntries.map((entry, index) => (
+              {visitData.serviceEntries.map((entry) => (
                 <div key={entry.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
                   <div className="grid grid-cols-12 gap-4 items-center text-sm">
                     <div className="col-span-3 text-gray-900">
@@ -180,7 +250,7 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange, onBlur }) => {
                     <div className="col-span-2 text-center">
                       <button
                         type="button"
-                        onClick={() => handleRemoveEntry(entry.id)}
+                        onClick={() => onRemoveEntry(entry.id)}
                         className="inline-flex items-center justify-center w-8 h-8 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-all duration-200"
                         title="Remove entry"
                       >
@@ -194,9 +264,44 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange, onBlur }) => {
           </div>
 
           <div className="text-sm text-gray-600">
-            Total entries: {formData.serviceEntries.length}
+            Total entries: {visitData.serviceEntries.length}
           </div>
         </div>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="space-y-12">
+      <div className="text-center">
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">Medical Visits</h2>
+        <p className="text-gray-600">Please provide medical visit details and service information</p>
+      </div>
+
+      {/* First Visit Section */}
+      {renderVisitSection(
+        'First Visit',
+        formData.firstVisit,
+        firstVisitEntry,
+        handleFirstVisitChange,
+        handleFirstVisitEntryChange,
+        handleAddFirstVisitEntry,
+        handleRemoveFirstVisitEntry,
+        errors.firstVisitDate,
+        errors.firstVisitDays
+      )}
+
+      {/* Second Visit Section */}
+      {renderVisitSection(
+        'Second Visit',
+        formData.secondVisit,
+        secondVisitEntry,
+        handleSecondVisitChange,
+        handleSecondVisitEntryChange,
+        handleAddSecondVisitEntry,
+        handleRemoveSecondVisitEntry,
+        errors.secondVisitDate,
+        errors.secondVisitDays
       )}
     </div>
   );
