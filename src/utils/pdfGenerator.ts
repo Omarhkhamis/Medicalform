@@ -1,264 +1,393 @@
-import jsPDF from 'jspdf';
-import { FormData } from '../types/form';
+// src/utils/pdfGenerator.ts
+import pdfMake from 'pdfmake/build/pdfmake';
 
-const convertImageToBase64 = (file: File): Promise<string> => {
+// Fonts (Roboto only)
+import robotoRegularUrl from '../fonts/Roboto-Regular.ttf?url';
+import robotoBoldUrl from '../fonts/Roboto-Bold.ttf?url';
+
+// Top/Bottom banners — SVG only
+import headerSvgUrl from '../fonts/header.svg?url';
+import footerSvgUrl from '../fonts/footer.svg?url';
+
+import { FormData, ServiceEntry } from '../types/form';
+
+/* ========= config ========= */
+const SQUARE_SIDE = 220;      // حجم الصور المربعة في الجاليري
+const HEADER_IMG_H = 70;      // اضبطها حسب ارتفاع الـ header.svg
+const FOOTER_IMG_H = 90;      // اضبطها حسب ارتفاع الـ footer.svg
+
+/* ========= helpers ========= */
+const isEmpty = (v?: string | number | '') => v === '' || v === undefined || v === null;
+const asText = (v?: string | number | '') => (isEmpty(v) ? '-' : String(v));
+
+function toBase64(buffer: ArrayBuffer): string {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
+async function fetchAsBase64(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return toBase64(await res.arrayBuffer());
+  } catch { return null; }
+}
+
+async function fetchAsText(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return await res.text();
+  } catch { return null; }
+}
+
+const fileToDataURL = (f: File) =>
+  new Promise<string>((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = reject;
+    r.readAsDataURL(f);
+  });
+
+/** قصّ مركزي لمربع مع تغيير الحجم إلى side×side */
+function toSquareDataURL(src: string, side = SQUARE_SIDE): Promise<string> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-};
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = side; canvas.height = side;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return resolve(src);
 
-export const generatePDF = async (formData: FormData): Promise<void> => {
-  const pdf = new jsPDF('p', 'mm', 'a4');
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  
-  // Set up fonts
-  pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(20);
-  
-  // Title
-  const title = 'Medical Form Report';
-  const titleWidth = pdf.getTextWidth(title);
-  pdf.text(title, (pageWidth - titleWidth) / 2, 25);
-  
-  // Add horizontal line
-  pdf.setLineWidth(0.5);
-  pdf.line(20, 30, pageWidth - 20, 30);
-  
-  let yPosition = 45;
-  
-  // Helper function to add section
-  const addSection = (sectionTitle: string, fields: Array<{label: string, value: string | number}>) => {
-    // Section title
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(16);
-    pdf.setTextColor(51, 51, 51);
-    pdf.text(sectionTitle, 20, yPosition);
-    yPosition += 10;
-    
-    // Section content
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(11);
-    pdf.setTextColor(68, 68, 68);
-    
-    fields.forEach(field => {
-      if (field.value) {
-        const text = `${field.label}: ${field.value}`;
-        const lines = pdf.splitTextToSize(text, pageWidth - 40);
-        pdf.text(lines, 25, yPosition);
-        yPosition += lines.length * 5;
-      }
-    });
-    
-    yPosition += 8;
-    
-    // Check if we need a new page
-    if (yPosition > pageHeight - 20) {
-      pdf.addPage();
-      yPosition = 20;
-    }
-  };
-  
-  // Step 1: Personal Information
-  addSection('Personal Information', [
-    { label: 'Consultant Name', value: formData.consultantName },
-    { label: 'Patient Name', value: formData.patientName },
-    { label: 'Phone Number', value: formData.phoneNumber },
-    { label: 'Patient ID', value: formData.patientId },
-    { label: 'Entry Date', value: formData.entryDate },
-    { label: 'Age', value: formData.age.toString() },
-    { label: 'Currency', value: formData.currency },
-    { label: 'Language', value: formData.language },
-    { label: 'Health Condition', value: formData.healthCondition },
-    { label: 'Services', value: formData.services }
-  ]);
-  
-  // Step 2: Medical Visit
-  addSection('First Visit Information', [
-    { label: 'Visit Date', value: formData.firstVisit.visitDate },
-    { label: 'Visit Days', value: formData.firstVisit.visitDays.toString() }
-  ]);
-  
-  // First Visit Service Entries
-  if (formData.firstVisit.serviceEntries.length > 0) {
-    addServiceEntriesTable('First Visit Service Entries', formData.firstVisit.serviceEntries);
-  }
-  
-  addSection('Second Visit Information', [
-    { label: 'Visit Date', value: formData.secondVisit.visitDate },
-    { label: 'Visit Days', value: formData.secondVisit.visitDays.toString() }
-  ]);
-  
-  // Second Visit Service Entries
-  if (formData.secondVisit.serviceEntries.length > 0) {
-    addServiceEntriesTable('Second Visit Service Entries', formData.secondVisit.serviceEntries);
-  }
-  
-  // Helper function to add service entries table
-  function addServiceEntriesTable(title: string, serviceEntries: any[]) {
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(16);
-    pdf.setTextColor(51, 51, 51);
-    pdf.text(title, 20, yPosition);
-    yPosition += 10;
-    
-    // Table header
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(10);
-    pdf.setTextColor(68, 68, 68);
-    
-    const tableStartY = yPosition;
-    const colWidths = [40, 40, 30, 30, 30];
-    const colPositions = [20, 60, 100, 130, 160];
-    
-    // Draw header
-    pdf.text('Service Name', colPositions[0], yPosition);
-    pdf.text('Service Type', colPositions[1], yPosition);
-    pdf.text('Price', colPositions[2], yPosition);
-    pdf.text('Quantity', colPositions[3], yPosition);
-    pdf.text('Total', colPositions[4], yPosition);
-    
-    yPosition += 8;
-    
-    // Draw header line
-    pdf.setLineWidth(0.3);
-    pdf.line(20, yPosition - 2, pageWidth - 20, yPosition - 2);
-    
-    // Table rows
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(9);
-    
-    serviceEntries.forEach((entry, index) => {
-      if (yPosition > pageHeight - 30) {
-        pdf.addPage();
-        yPosition = 20;
-      }
-      
-      const serviceName = entry.serviceName || '-';
-      const serviceType = entry.serviceType || '-';
-      const price = entry.price ? `${entry.price} ${formData.currency}` : '-';
-      const quantity = entry.quantity || '-';
-      const total = (entry.price && entry.quantity) ? 
-        `${(Number(entry.price) * Number(entry.quantity))} ${formData.currency}` : '-';
-      
-      pdf.text(serviceName, colPositions[0], yPosition);
-      pdf.text(serviceType, colPositions[1], yPosition);
-      pdf.text(price, colPositions[2], yPosition);
-      pdf.text(quantity.toString(), colPositions[3], yPosition);
-      pdf.text(total, colPositions[4], yPosition);
-      
-      yPosition += 6;
-    });
-    
-    yPosition += 8;
-  }
-  
-  // Add uploaded image if exists
-  if (formData.externalLink) {
-    addSection('External Link', [
-      { label: 'Link', value: formData.externalLink }
-    ]);
-    
-    // Add clickable link
-    if (yPosition > pageHeight - 20) {
-      pdf.addPage();
-      yPosition = 20;
-    }
-    
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(11);
-    pdf.setTextColor(0, 0, 255); // Blue color for link
-    pdf.textWithLink('Click here to visit the external link', 25, yPosition, { url: formData.externalLink });
-    yPosition += 15;
-  }
-  
-  // Step 3: Notes
-  if (formData.notes) {
-    addSection('Additional Notes', [
-      { label: 'Notes', value: formData.notes }
-    ]);
-  }
-  
-  // Add uploaded images if they exist
-  if (formData.uploadedImages && formData.uploadedImages.length > 0) {
-    try {
-      for (let i = 0; i < formData.uploadedImages.length; i++) {
-        const image = formData.uploadedImages[i];
-        const imageBase64 = await convertImageToBase64(image);
-        const imageFormat = image.type.includes('png') ? 'PNG' : 'JPEG';
-        
-        // Check if we need a new page
-        if (yPosition > pageHeight - 120) {
-          pdf.addPage();
-          yPosition = 20;
+        const ratio = img.width / img.height;
+        let sx = 0, sy = 0, sw = img.width, sh = img.height;
+        if (ratio > 1) { // أوسع من المطلوب -> نقص من العرض
+          sh = img.height; sw = sh; sx = (img.width - sw) / 2;
+        } else if (ratio < 1) { // أطول من المطلوب -> نقص من الارتفاع
+          sw = img.width; sh = sw; sy = (img.height - sh) / 2;
         }
-        
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(16);
-        pdf.text(`Uploaded Image ${i + 1}`, 20, yPosition);
-        yPosition += 15;
-        
-        // Calculate image dimensions to fit page width while preserving aspect ratio
-        const maxWidth = pageWidth - 40; // 20mm margin on each side
-        const maxHeight = 100; // Maximum height
-        
-        // Create a temporary image to get dimensions
-        const tempImg = new Image();
-        tempImg.src = imageBase64;
-        
-        // Use default dimensions if we can't get actual dimensions
-        let imgWidth = maxWidth;
-        let imgHeight = maxHeight;
-        
-        // Calculate aspect ratio and resize
-        if (tempImg.naturalWidth && tempImg.naturalHeight) {
-          const aspectRatio = tempImg.naturalWidth / tempImg.naturalHeight;
-          
-          if (aspectRatio > 1) {
-            // Landscape
-            imgWidth = Math.min(maxWidth, maxWidth);
-            imgHeight = imgWidth / aspectRatio;
-          } else {
-            // Portrait
-            imgHeight = Math.min(maxHeight, maxHeight);
-            imgWidth = imgHeight * aspectRatio;
-          }
-        }
-        
-        // Ensure image fits on current page
-        if (yPosition + imgHeight > pageHeight - 20) {
-          pdf.addPage();
-          yPosition = 20;
-        }
-        
-        pdf.addImage(imageBase64, imageFormat, 20, yPosition, imgWidth, imgHeight);
-        yPosition += imgHeight + 15;
-      }
-    } catch (error) {
-      console.error('Error adding images to PDF:', error);
-    }
-  }
-  
-  // Add footer
-  pdf.setFont('helvetica', 'italic');
-  pdf.setFontSize(8);
-  pdf.setTextColor(128, 128, 128);
-  const footer = `Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`;
-  const footerWidth = pdf.getTextWidth(footer);
-  pdf.text(footer, (pageWidth - footerWidth) / 2, pageHeight - 10);
-  
-  // Save the PDF
-  const patientName = formData.patientName ? formData.patientName.replace(/\s+/g, '_') : 'patient';
-  const fileName = `medical_form_${patientName}_${new Date().toISOString().split('T')[0]}.pdf`;
-  pdf.save(fileName);
-  
-  // Add a small delay to ensure the download completes
-  return new Promise<void>((resolve) => {
-    setTimeout(() => {
-      resolve();
-    }, 100);
+        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, side, side);
+        resolve(canvas.toDataURL('image/png'));
+      } catch { resolve(src); }
+    };
+    img.onerror = reject;
+    img.src = src;
   });
-};
+}
+
+/* ========= assets ========= */
+let headerSvgText: string | null = null;
+let footerSvgText: string | null = null;
+
+let assetsReady: Promise<void> | null = null;
+async function ensureAssets(): Promise<void> {
+  if (!assetsReady) {
+    assetsReady = (async () => {
+      const pm = pdfMake as unknown as { vfs?: Record<string, string>; fonts?: any };
+      if (!pm.vfs) pm.vfs = {};
+
+      // Roboto
+      const RREG = 'Roboto-Regular.ttf';
+      const RBLD = 'Roboto-Bold.ttf';
+      if (!pm.vfs[RREG]) {
+        const b64 = await fetchAsBase64(robotoRegularUrl);
+        if (!b64) throw new Error('Failed to load Roboto-Regular.ttf');
+        pm.vfs[RREG] = b64;
+      }
+      if (!pm.vfs[RBLD]) {
+        const b64 = await fetchAsBase64(robotoBoldUrl);
+        if (!b64) throw new Error('Failed to load Roboto-Bold.ttf');
+        pm.vfs[RBLD] = b64;
+      }
+
+      // SVG banners
+      if (headerSvgText == null) headerSvgText = await fetchAsText(headerSvgUrl);
+      if (footerSvgText == null) footerSvgText = await fetchAsText(footerSvgUrl);
+
+      (pdfMake as any).fonts = {
+        Roboto: { normal: RREG, bold: RBLD, italics: RREG, bolditalics: RBLD },
+      };
+    })();
+  }
+  return assetsReady;
+}
+
+/* ========= common utils ========= */
+function n(v: number | '' | undefined) { return typeof v === 'number' ? v : Number(v || 0); }
+function lineTotal(s: ServiceEntry) { return n(s.price) * n(s.quantity); }
+function money(v: number | '' | undefined, currency: string) { return isEmpty(v) ? '-' : `${v} ${currency}`; }
+
+/* ========= table layout ========= */
+function softBoxLayout() {
+  return {
+    hLineColor: () => '#cfd8dc',
+    vLineColor: () => '#cfd8dc',
+    hLineWidth: (i: number) => (i === 1 ? 1.2 : 0.6),
+    vLineWidth: () => 0.6,
+    paddingLeft: () => 6, paddingRight: () => 6,
+    paddingTop: () => 6, paddingBottom: () => 6,
+    fillColor: (rowIndex: number) => (rowIndex === 0 ? '#eef6ff' : '#fafafa'),
+  };
+}
+
+const Label = (t: string) => ({ text: t, style: 'label' });
+const Val   = (v: string | number | '') =>
+  isEmpty(v) ? ({ text: '-', style: 'placeholder' }) :
+               ({ text: String(v), style: 'value' });
+
+/* ========= sections ========= */
+function PersonalInfoBox(data: FormData) {
+  return {
+    margin: [0, 6, 0, 10],
+    table: {
+      widths: ['*', '*'],
+      body: [
+        [{ text: 'Personal Information', style: 'boxTitle', colSpan: 2 }, {}],
+        [
+          { columns: [Label('Consultant Name'), { text: ': ', width: 6 }, Val(data.consultantName)], columnGap: 4 },
+          { columns: [Label('Age'),             { text: ': ', width: 6 }, Val(data.age)], columnGap: 4 },
+        ],
+        [
+          { columns: [Label('Patient Name'), { text: ': ', width: 6 }, Val(data.patientName)], columnGap: 4 },
+          { columns: [Label('Currency'),     { text: ': ', width: 6 }, Val(data.currency)], columnGap: 4 },
+        ],
+        [
+          { columns: [Label('Phone Number'), { text: ': ', width: 6 }, Val(data.phoneNumber)], columnGap: 4 },
+          { columns: [Label('Language'),     { text: ': ', width: 6 }, Val(data.language)], columnGap: 4 },
+        ],
+        [
+          { columns: [Label('Patient ID'),       { text: ': ', width: 6 }, Val(data.patientId)], columnGap: 4 },
+          { columns: [Label('Health Condition'), { text: ': ', width: 6 }, Val(data.healthCondition)], columnGap: 4 },
+        ],
+        [
+          { columns: [Label('Entry Date'), { text: ': ', width: 6 }, Val(data.entryDate)], columnGap: 4 },
+          { columns: [Label('Services'),   { text: ': ', width: 6 }, Val(data.services)], columnGap: 4 },
+        ],
+      ],
+    },
+    layout: softBoxLayout(),
+  };
+}
+
+function VisitInfoBox(title: string, date: string, days: number | '') {
+  return {
+    margin: [0, 6, 0, 8],
+    table: {
+      widths: ['*', '*'],
+      body: [
+        [{ text: title, style: 'boxTitle', colSpan: 2 }, {}],
+        [
+          { columns: [Label('Visit Date'), { text: ': ', width: 6 }, Val(date)], columnGap: 4 },
+          { columns: [Label('Visit Days'), { text: ': ', width: 6 }, Val(days)], columnGap: 4 },
+        ],
+      ],
+    },
+    layout: softBoxLayout(),
+  };
+}
+
+function ServicesBox(title: string, entries: ServiceEntry[], currency: string) {
+  const header = [
+    { text: 'Service Name', style: 'tableHeader', alignment: 'center' },
+    { text: 'Service Type', style: 'tableHeader', alignment: 'center' },
+    { text: 'Price',        style: 'tableHeader', alignment: 'center' },
+    { text: 'Quantity',     style: 'tableHeader', alignment: 'center' },
+    { text: 'Total',        style: 'tableHeader', alignment: 'center' },
+  ];
+  const rows = entries.map((s) => ([
+    { text: asText(s.serviceName), alignment: 'center' },
+    { text: asText(s.serviceType), alignment: 'center' },
+    { text: money(s.price as number, currency), alignment: 'center' },
+    { text: isEmpty(s.quantity) ? '-' : String(s.quantity), alignment: 'center' },
+    { text: (isEmpty(s.price) || isEmpty(s.quantity)) ? '-' : `${lineTotal(s)} ${currency}`, alignment: 'center' },
+  ]));
+
+  return {
+    margin: [0, 4, 0, 8],
+    table: {
+      widths: ['*', '*', 55, 55, 60],
+      body: [
+        [{ text: title, style: 'boxTitle', colSpan: 5 }, {}, {}, {}, {}],
+        header,
+        ...rows,
+      ],
+    },
+    layout: softBoxLayout(),
+  };
+}
+
+// Notes خارج جدول لتتدفق عبر الصفحات
+function NotesBox(text: string) {
+  const s = asText(text);
+  if (!s || s === '-') return { text: '' };
+  return {
+    margin: [0, 8, 0, 8],
+    stack: [
+      { text: 'General Notes', style: 'boxTitle', margin: [0, 0, 0, 4] },
+      { text: s, style: 'value' },
+    ],
+  };
+}
+
+function AboutClinicBox() {
+  const aboutText =
+    'At DENTAL CLINIC, we are committed to providing the highest standards of quality, expertise, and healthcare, delivered by the most experienced medical and administrative staff. We offer cosmetic medical services by a team of the best doctors in the field of aesthetic medicine in Turkey.';
+  return {
+    margin: [0, 6, 0, 0],
+    table: {
+      widths: ['*'],
+      body: [
+        [{ text: 'About the Clinic', style: 'boxTitle' }],
+        [{ text: aboutText, style: 'value', alignment: 'left' }],
+      ],
+    },
+    layout: softBoxLayout(),
+  };
+}
+
+/* ========= PAGE 2: External Link + Images grid ========= */
+function ExternalLinkBox(url?: string) {
+  const link = asText(url);
+  return {
+    margin: [0, 6, 0, 10],
+    table: {
+      widths: ['*'],
+      body: [
+        [{ text: 'External Link', style: 'boxTitle' }],
+        [{
+          text: link,
+          link: /^https?:\/\//i.test(link) ? link : undefined,
+          color: '#1a73e8',
+          decoration: 'underline',
+          fontSize: 10,
+        }],
+      ],
+    },
+    layout: softBoxLayout(),
+  };
+}
+
+function ImagesGrid(squareDataUrls: string[]) {
+  if (!squareDataUrls || squareDataUrls.length === 0) return { text: '' };
+  const rows: any[] = [];
+  for (let i = 0; i < squareDataUrls.length; i += 2) {
+    const row: any[] = squareDataUrls.slice(i, i + 2).map((src) => ({
+      image: src,
+      width: SQUARE_SIDE,
+      height: SQUARE_SIDE,
+      margin: [0, 6, 0, 6],
+      alignment: 'center',
+    }));
+    if (row.length === 1) row.push({ text: ' ' } as any); // مكان فارغ للعمود الثاني
+    rows.push(row);
+  }
+  return { margin: [0, 8, 0, 0], table: { widths: ['*', '*'], body: rows }, layout: 'noBorders' as const };
+}
+
+function GalleryPage(externalLink?: string, squareDataUrls: string[] = []) {
+  return [
+    { text: 'Gallery & Link', style: 'headerEN', margin: [0, 0, 0, 6], alignment: 'center', pageBreak: 'before' },
+    ExternalLinkBox(externalLink),
+    { text: 'Uploaded Images', style: 'boxTitle', margin: [0, 6, 0, 2] },
+    ImagesGrid(squareDataUrls),
+  ];
+}
+
+/* ========= خلفية SVG بدل header/footer ========= */
+function pageBackground(_: number, pageSize: any) {
+  const elems: any[] = [];
+  if (headerSvgText) {
+    elems.push({ svg: headerSvgText, width: pageSize.width, absolutePosition: { x: 0, y: 0 } });
+  }
+  if (footerSvgText) {
+    elems.push({ svg: footerSvgText, width: pageSize.width, absolutePosition: { x: 0, y: pageSize.height - FOOTER_IMG_H } });
+  }
+  return elems;
+}
+
+/* ========= MAIN ========= */
+export async function generatePDF(formData: FormData): Promise<void> {
+  try {
+    await ensureAssets();
+
+    // جهّز صور Step3 كمربعات 160×160
+    const uploaded = (formData as any).uploadedImages as File[] | string[] | undefined;
+    let squareUrls: string[] = [];
+    if (uploaded && uploaded.length) {
+      const dataUrls = await Promise.all(
+        uploaded.map((it) => (typeof it === 'string' ? Promise.resolve(it) : fileToDataURL(it)))
+      );
+      squareUrls = await Promise.all(dataUrls.map((u) => toSquareDataURL(u, SQUARE_SIDE)));
+    }
+
+    const currency = formData.currency || '';
+    const t1 = formData.firstVisit.serviceEntries.reduce((s, e) => s + lineTotal(e), 0);
+    const t2 = formData.secondVisit.serviceEntries.reduce((s, e) => s + lineTotal(e), 0);
+    const all = t1 + t2;
+
+    const docDefinition = {
+      pageSize: 'A4',
+      pageMargins: [20, HEADER_IMG_H + 16, 20, FOOTER_IMG_H + 16],
+      background: pageBackground,
+
+      content: [
+        // الصفحة الأولى
+        { text: 'Medical Form Report', style: 'headerEN', alignment: 'center', margin: [0, 0, 0, 6] },
+
+        PersonalInfoBox(formData),
+
+        VisitInfoBox('First Visit Information', formData.firstVisit.visitDate, formData.firstVisit.visitDays),
+        ServicesBox('First Visit Service Entries', formData.firstVisit.serviceEntries, currency),
+
+        VisitInfoBox('Second Visit Information', formData.secondVisit.visitDate, formData.secondVisit.visitDays),
+        ServicesBox('Second Visit Service Entries', formData.secondVisit.serviceEntries, currency),
+
+        {
+          columns: [
+            { text: 'Grand Total', style: 'label', alignment: 'right' },
+            { text: `${all} ${currency}`, style: 'value', alignment: 'right' },
+          ],
+          columnGap: 8,
+          margin: [0, 6, 0, 6],
+        },
+
+        NotesBox(formData.notes || ''),
+        AboutClinicBox(),
+
+        // الصفحة الثانية (تمتد تلقائيًا لصفحات أخرى إذا لزم): الرابط + الصور 160×160
+        ...GalleryPage((formData as any).externalLink, squareUrls),
+      ],
+
+      defaultStyle: { font: 'Roboto', fontSize: 9, alignment: 'left' },
+      styles: {
+        headerEN: { fontSize: 16, bold: true },
+        boxTitle: { fontSize: 11, bold: true },
+        tableHeader: { bold: true, fillColor: '#e3f2fd' },
+        label: { bold: true, fontSize: 9 },
+        value: { fontSize: 9 },
+        placeholder: { bold: true, color: '#999', fontSize: 9 },
+      },
+    } as any;
+
+    await new Promise<void>((resolve) => {
+      (pdfMake as any).createPdf(docDefinition).getBlob((blob: Blob) => {
+        const url = URL.createObjectURL(blob);
+        const win = window.open(url, '_blank');
+        if (!win) {
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'medical-report.pdf';
+          a.click();
+        }
+        setTimeout(() => URL.revokeObjectURL(url), 30000);
+        resolve();
+      });
+    });
+  } catch (err) {
+    console.error('PDF generation error:', err);
+    alert('Error generating PDF. Check console for details.');
+  }
+}
