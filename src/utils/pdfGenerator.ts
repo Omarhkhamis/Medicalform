@@ -16,6 +16,49 @@ const SQUARE_SIDE = 220; // حجم الصور المربعة في الجالير
 const HEADER_IMG_H = 70; // اضبطها حسب ارتفاع الـ header.svg
 const FOOTER_IMG_H = 90; // اضبطها حسب ارتفاع الـ footer.svg
 
+/* ========= options & label mappers ========= */
+const currencyOptions = [
+  { value: "EUR", label: "Euro (€)" },
+  { value: "USD", label: "US Dollar ($)" },
+  { value: "GBP", label: "British Pound (£)" },
+  { value: "CAD", label: "Canadian Dollar (C$)" },
+];
+
+const languageOptions = [
+  { value: "arabic", label: "Arabic" },
+  { value: "english", label: "English" },
+  { value: "french", label: "French" },
+  { value: "spanish", label: "Spanish" },
+  { value: "turkish", label: "Turkish" },
+  { value: "russian", label: "Russian" },
+  { value: "other", label: "Other" },
+];
+
+const healthConditionOptions = [
+  { value: "good", label: "Good" },
+  { value: "requires_report", label: "Requires medical report" },
+];
+
+// خدمات Step1 + خدمات Step2 الإضافية (للاستخدام في الجداول)
+const servicesOptionsAll = [
+  { value: "dental", label: "Dental" },
+  { value: "hollywood_smile", label: "Hollywood Smile" },
+  { value: "dental_implant", label: "Dental Implant" },
+  { value: "zirconium_crown", label: "Zirconium Crown" },
+  { value: "open_sinus_lift", label: "Open Sinus Lift" },
+  { value: "close_sinus_lift", label: "Close Sinus Lift" },
+  { value: "veneer_lens", label: "Veneer Lens" },
+];
+
+function mapLabel(
+  options: { value: string; label: string }[],
+  value?: string | number | ""
+) {
+  const v = value == null ? "" : String(value);
+  const found = options.find((o) => o.value === v);
+  return found ? found.label : v;
+}
+
 /* ========= helpers ========= */
 const isEmpty = (v?: string | number | "") =>
   v === "" || v === undefined || v === null;
@@ -75,10 +118,12 @@ function toSquareDataURL(src: string, side = SQUARE_SIDE): Promise<string> {
           sw = img.width,
           sh = img.height;
         if (ratio > 1) {
+          // أوسع من المطلوب -> نقص من العرض
           sh = img.height;
           sw = sh;
           sx = (img.width - sw) / 2;
         } else if (ratio < 1) {
+          // أطول من المطلوب -> نقص من الارتفاع
           sw = img.width;
           sh = sw;
           sy = (img.height - sh) / 2;
@@ -108,6 +153,7 @@ async function ensureAssets(): Promise<void> {
       };
       if (!pm.vfs) pm.vfs = {};
 
+      // Roboto
       const RREG = "Roboto-Regular.ttf";
       const RBLD = "Roboto-Bold.ttf";
       if (!pm.vfs[RREG]) {
@@ -121,6 +167,7 @@ async function ensureAssets(): Promise<void> {
         pm.vfs[RBLD] = b64;
       }
 
+      // SVG banners
       if (headerSvgText == null)
         headerSvgText = await fetchAsText(headerSvgUrl);
       if (footerSvgText == null)
@@ -201,7 +248,7 @@ function PersonalInfoBox(data: FormData) {
             columns: [
               Label("Currency"),
               { text: ": ", width: 6 },
-              Val(data.currency),
+              Val(mapLabel(currencyOptions, data.currency)),
             ],
             columnGap: 4,
           },
@@ -219,7 +266,7 @@ function PersonalInfoBox(data: FormData) {
             columns: [
               Label("Language"),
               { text: ": ", width: 6 },
-              Val(data.language),
+              Val(mapLabel(languageOptions, data.language)),
             ],
             columnGap: 4,
           },
@@ -237,7 +284,7 @@ function PersonalInfoBox(data: FormData) {
             columns: [
               Label("Health Condition"),
               { text: ": ", width: 6 },
-              Val(data.healthCondition),
+              Val(mapLabel(healthConditionOptions, data.healthCondition)),
             ],
             columnGap: 4,
           },
@@ -255,7 +302,7 @@ function PersonalInfoBox(data: FormData) {
             columns: [
               Label("Services"),
               { text: ": ", width: 6 },
-              Val(data.services),
+              Val(mapLabel(servicesOptionsAll, data.services)),
             ],
             columnGap: 4,
           },
@@ -298,7 +345,10 @@ function ServicesBox(title: string, entries: ServiceEntry[], currency: string) {
     { text: "Total", style: "tableHeader", alignment: "center" },
   ];
   const rows = entries.map((s) => [
-    { text: asText(s.serviceName), alignment: "center" },
+    {
+      text: asText(mapLabel(servicesOptionsAll, s.serviceName as any)),
+      alignment: "center",
+    },
     { text: asText(s.serviceType), alignment: "center" },
     { text: money(s.price as number, currency), alignment: "center" },
     {
@@ -328,6 +378,7 @@ function ServicesBox(title: string, entries: ServiceEntry[], currency: string) {
   };
 }
 
+// Notes خارج جدول لتتدفق عبر الصفحات
 function NotesBox(text: string) {
   const s = asText(text);
   if (!s || s === "-") return { text: "" };
@@ -342,7 +393,7 @@ function NotesBox(text: string) {
 
 function AboutClinicBox() {
   const aboutText =
-    "At DENTAL CLINIC, we are committed to providing the highest standards...";
+    "At DENTAL CLINIC, we are committed to providing the highest standards of quality, expertise, and healthcare, delivered by the most experienced medical and administrative staff. We offer cosmetic medical services by a team of the best doctors in the field of aesthetic medicine in Turkey.";
   return {
     margin: [0, 6, 0, 0],
     table: {
@@ -368,7 +419,7 @@ function ImagesGrid(squareDataUrls: string[]) {
       margin: [0, 6, 0, 6],
       alignment: "center",
     }));
-    if (row.length === 1) row.push({ text: " " } as any);
+    if (row.length === 1) row.push({ text: " " } as any); // مكان فارغ للعمود الثاني
     rows.push(row);
   }
   return {
@@ -390,7 +441,7 @@ function GalleryPage(squareDataUrls: string[] = []) {
   ];
 }
 
-/* ========= خلفية SVG ========= */
+/* ========= خلفية SVG بدل header/footer ========= */
 function pageBackground(_: number, pageSize: any) {
   const elems: any[] = [];
   if (headerSvgText) {
@@ -415,6 +466,7 @@ export async function generatePDF(formData: FormData): Promise<void> {
   try {
     await ensureAssets();
 
+    // جهّز صور Step3 كمربعات 220×220 (حسب SQUARE_SIDE)
     const uploaded = (formData as any).uploadedImages as
       | File[]
       | string[]
@@ -448,6 +500,7 @@ export async function generatePDF(formData: FormData): Promise<void> {
       background: pageBackground,
 
       content: [
+        // الصفحة الأولى
         {
           text: "Medical Form Report",
           style: "headerEN",
@@ -491,6 +544,7 @@ export async function generatePDF(formData: FormData): Promise<void> {
         NotesBox(formData.notes || ""),
         AboutClinicBox(),
 
+        // الصفحة الثانية (تمتد تلقائيًا لصفحات أخرى إذا لزم): الصور فقط
         ...GalleryPage(squareUrls),
       ],
 

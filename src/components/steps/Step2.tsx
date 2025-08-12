@@ -1,24 +1,94 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { StepProps, ServiceEntry } from "../../types/form";
 import FormInput from "../FormInput";
 import { Plus, X } from "lucide-react";
 
+/* --------------------------------------------------
+   ✅ التحقق اليدوي (مدموج ومصدَّر للأب)
+-------------------------------------------------- */
+export type Visit = {
+  visitDate: string;
+  visitDays: number | "";
+  serviceEntries?: Array<any>;
+};
+
+export type Step2Data = {
+  firstVisit: Visit;
+  secondVisit: Visit;
+  currency?: string;
+};
+
+export type Step2Errors = {
+  firstVisitDate?: string;
+  firstVisitDays?: string;
+  secondVisitDate?: string;
+  secondVisitDays?: string;
+};
+
+const isEmpty = (v: unknown) =>
+  v === undefined ||
+  v === null ||
+  v === "" ||
+  (typeof v === "number" && isNaN(v));
+
+export function validateStep2Data(data: Step2Data): {
+  errors: Step2Errors;
+  isValid: boolean;
+} {
+  const errors: Step2Errors = {};
+
+  // أول زيارة: مطلوبة دائمًا
+  if (isEmpty(data.firstVisit?.visitDate))
+    errors.firstVisitDate = "First visit date is required";
+  const fvDays = data.firstVisit?.visitDays;
+  if (fvDays === "" || Number(fvDays) <= 0)
+    errors.firstVisitDays = "First visit days must be > 0";
+
+  // الزيارة الثانية: مطلوبة فقط إذا فيها بيانات
+  const sv = data.secondVisit ?? ({} as Visit);
+  const hasSecondData =
+    !!sv.visitDate || !!sv.visitDays || (sv.serviceEntries?.length ?? 0) > 0;
+
+  if (hasSecondData) {
+    if (isEmpty(sv.visitDate))
+      errors.secondVisitDate = "Second visit date is required";
+    const svDays = sv.visitDays;
+    if (svDays === "" || Number(svDays) <= 0)
+      errors.secondVisitDays = "Second visit days must be > 0";
+  }
+
+  return { errors, isValid: Object.keys(errors).length === 0 };
+}
+
+/* --------------------------------------------------
+   مكوّن Step2
+-------------------------------------------------- */
 const Step2: React.FC<StepProps> = ({ formData, errors, onChange }) => {
-  const [firstVisitEntry, setFirstVisitEntry] = useState({
+  const [firstVisitEntry, setFirstVisitEntry] = useState<{
+    serviceName: string;
+    serviceType: string;
+    price: number | "";
+    quantity: number | "";
+  }>({
     serviceName: "",
     serviceType: "",
-    price: "" as number | "",
-    quantity: "" as number | "",
+    price: "",
+    quantity: "",
   });
 
-  const [secondVisitEntry, setSecondVisitEntry] = useState({
+  const [secondVisitEntry, setSecondVisitEntry] = useState<{
+    serviceName: string;
+    serviceType: string;
+    price: number | "";
+    quantity: number | "";
+  }>({
     serviceName: "",
     serviceType: "",
-    price: "" as number | "",
-    quantity: "" as number | "",
+    price: "",
+    quantity: "",
   });
 
-  // فعّل الزيارة الثانية تلقائياً إذا فيها بيانات مسبقاً
+  // فعّل الزيارة الثانية تلقائيًا إذا فيها بيانات مسبقًا
   const initiallyEnabled = useMemo(() => {
     const v = formData.secondVisit;
     return Boolean(
@@ -31,6 +101,12 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange }) => {
   const [secondVisitEnabled, setSecondVisitEnabled] =
     useState<boolean>(initiallyEnabled);
 
+  // تزامن حالة التفعيل مع تغيّر بيانات الزيارة الثانية
+  useEffect(() => {
+    setSecondVisitEnabled(initiallyEnabled);
+  }, [initiallyEnabled]);
+
+  // خيارات الخدمة
   const serviceNameOptions = [
     { value: "dental_implant", label: "Dental Implant" },
     { value: "zirconium_crown", label: "Zirconium Crown" },
@@ -82,7 +158,10 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange }) => {
 
       const updatedFirstVisit = {
         ...formData.firstVisit,
-        serviceEntries: [...formData.firstVisit.serviceEntries, newEntry],
+        serviceEntries: [
+          ...(formData.firstVisit?.serviceEntries ?? []),
+          newEntry,
+        ],
       };
       onChange("firstVisit", updatedFirstVisit as any);
 
@@ -110,7 +189,10 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange }) => {
 
       const updatedSecondVisit = {
         ...formData.secondVisit,
-        serviceEntries: [...formData.secondVisit.serviceEntries, newEntry],
+        serviceEntries: [
+          ...(formData.secondVisit?.serviceEntries ?? []),
+          newEntry,
+        ],
       };
       onChange("secondVisit", updatedSecondVisit as any);
 
@@ -126,7 +208,7 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange }) => {
   const handleRemoveFirstVisitEntry = (id: string) => {
     const updatedFirstVisit = {
       ...formData.firstVisit,
-      serviceEntries: formData.firstVisit.serviceEntries.filter(
+      serviceEntries: (formData.firstVisit?.serviceEntries ?? []).filter(
         (entry) => entry.id !== id
       ),
     };
@@ -136,7 +218,7 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange }) => {
   const handleRemoveSecondVisitEntry = (id: string) => {
     const updatedSecondVisit = {
       ...formData.secondVisit,
-      serviceEntries: formData.secondVisit.serviceEntries.filter(
+      serviceEntries: (formData.secondVisit?.serviceEntries ?? []).filter(
         (entry) => entry.id !== id
       ),
     };
@@ -145,7 +227,7 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange }) => {
 
   const formatPrice = (price: number | "", currency: string) => {
     if (price === "" || price === 0) return "-";
-    return `${price} ${currency}`;
+    return `${price} ${currency ?? ""}`;
   };
 
   const renderVisitSection = (
@@ -249,7 +331,7 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange }) => {
       </div>
 
       {/* Service Entries List */}
-      {visitData.serviceEntries.length > 0 && (
+      {(visitData.serviceEntries ?? []).length > 0 && (
         <div className="space-y-4">
           <h4 className="text-lg font-medium text-gray-800">Service Entries</h4>
 
@@ -265,7 +347,7 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange }) => {
             </div>
 
             <div className="divide-y divide-gray-200">
-              {visitData.serviceEntries.map((entry) => (
+              {(visitData.serviceEntries ?? []).map((entry) => (
                 <div
                   key={entry.id}
                   className="px-6 py-4 hover:bg-gray-50 transition-colors"
@@ -300,7 +382,7 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange }) => {
           </div>
 
           <div className="text-sm text-gray-600">
-            Total entries: {visitData.serviceEntries.length}
+            Total entries: {(visitData.serviceEntries ?? []).length}
           </div>
         </div>
       )}
@@ -311,13 +393,11 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange }) => {
   const toggleSecondVisit = (enabled: boolean) => {
     setSecondVisitEnabled(enabled);
     if (!enabled) {
-      // مسح بيانات الزيارة الثانية بالكامل
       onChange("secondVisit", {
         visitDate: "",
         visitDays: "",
         serviceEntries: [],
       } as any);
-      // إعادة ضبط نموذج الإدخال المؤقت
       setSecondVisitEntry({
         serviceName: "",
         serviceType: "",
@@ -326,6 +406,14 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange }) => {
       });
     }
   };
+
+  // --- لزوم مشروط لإظهار الأخطاء فقط عند الحاجة داخل الواجهة ---
+  const secondVisitHasAnyData = Boolean(
+    formData.secondVisit?.visitDate ||
+      formData.secondVisit?.visitDays ||
+      (formData.secondVisit?.serviceEntries?.length ?? 0) > 0
+  );
+  const secondVisitRequireFields = secondVisitEnabled && secondVisitHasAnyData;
 
   return (
     <div className="space-y-12">
@@ -341,7 +429,10 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange }) => {
       {/* First Visit Section (Required) */}
       {renderVisitSection(
         "First Visit",
-        formData.firstVisit,
+        {
+          ...formData.firstVisit,
+          serviceEntries: formData.firstVisit?.serviceEntries ?? [],
+        },
         firstVisitEntry,
         handleFirstVisitChange,
         handleFirstVisitEntryChange,
@@ -349,7 +440,7 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange }) => {
         handleRemoveFirstVisitEntry,
         errors.firstVisitDate,
         errors.firstVisitDays,
-        true // required
+        true
       )}
 
       {/* Toggle for Second Visit */}
@@ -369,19 +460,22 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange }) => {
         </label>
       </div>
 
-      {/* Second Visit Section (Optional) */}
+      {/* Second Visit Section (Optional + شرطية الأخطاء في الواجهة) */}
       {secondVisitEnabled &&
         renderVisitSection(
           "Second Visit",
-          formData.secondVisit,
+          {
+            ...formData.secondVisit,
+            serviceEntries: formData.secondVisit?.serviceEntries ?? [],
+          },
           secondVisitEntry,
           handleSecondVisitChange,
           handleSecondVisitEntryChange,
           handleAddSecondVisitEntry,
           handleRemoveSecondVisitEntry,
-          errors.secondVisitDate,
-          errors.secondVisitDays,
-          false // NOT required
+          secondVisitRequireFields ? errors.secondVisitDate : undefined,
+          secondVisitRequireFields ? errors.secondVisitDays : undefined,
+          false
         )}
     </div>
   );

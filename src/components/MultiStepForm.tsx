@@ -15,7 +15,6 @@ const MultiStepForm: React.FC = () => {
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
 
   const [formData, setFormData] = useState<FormData>({
-    // Step 1
     consultantName: "",
     patientName: "",
     phoneNumber: "",
@@ -26,8 +25,6 @@ const MultiStepForm: React.FC = () => {
     language: "",
     healthCondition: "",
     services: "",
-
-    // Step 2
     firstVisit: {
       visitDate: "",
       visitDays: "",
@@ -38,8 +35,6 @@ const MultiStepForm: React.FC = () => {
       visitDays: "",
       serviceEntries: [],
     },
-
-    // Step 3
     uploadedImages: [],
     externalLink: "",
     notes: "",
@@ -47,9 +42,11 @@ const MultiStepForm: React.FC = () => {
 
   const [errors, setErrors] = useState<FormErrors>({});
 
-  const handleFieldChange = (field: keyof FormData, value: string | number) => {
+  const handleFieldChange = (
+    field: keyof FormData,
+    value: string | number | File[]
+  ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing if field has been touched or submit attempted
     if (errors[field] && (touchedFields.has(field) || hasAttemptedSubmit)) {
       setErrors((prev) => ({ ...prev, [field]: "" }));
     }
@@ -57,13 +54,12 @@ const MultiStepForm: React.FC = () => {
 
   const handleFieldBlur = (field: keyof FormData) => {
     setTouchedFields((prev) => new Set(prev).add(field));
-
-    // Validate only this field if it has been touched
     const fieldErrors = getStepErrors(currentStep);
     if (fieldErrors[field]) {
       setErrors((prev) => ({ ...prev, [field]: fieldErrors[field] }));
     }
   };
+
   const getStepErrors = (step: number): FormErrors => {
     const newErrors: FormErrors = {};
 
@@ -86,35 +82,41 @@ const MultiStepForm: React.FC = () => {
     }
 
     if (step === 2) {
+      // First visit is always required
       if (!formData.firstVisit.visitDate)
         newErrors.firstVisitDate = "First visit date is required";
       if (!formData.firstVisit.visitDays)
         newErrors.firstVisitDays = "First visit days is required";
-      if (!formData.secondVisit.visitDate)
-        newErrors.secondVisitDate = "Second visit date is required";
-      if (!formData.secondVisit.visitDays)
-        newErrors.secondVisitDays = "Second visit days is required";
+
+      // Second visit is optional — validate only if it has data
+      const hasSecondVisitData =
+        formData.secondVisit.visitDate ||
+        formData.secondVisit.visitDays ||
+        (formData.secondVisit.serviceEntries?.length ?? 0) > 0;
+
+      if (hasSecondVisitData) {
+        if (!formData.secondVisit.visitDate)
+          newErrors.secondVisitDate = "Second visit date is required";
+        if (!formData.secondVisit.visitDays)
+          newErrors.secondVisitDays = "Second visit days is required";
+      }
     }
 
     return newErrors;
   };
 
-  // Only show errors for touched fields or after submit attempt
   useEffect(() => {
     if (hasAttemptedSubmit) {
       const stepErrors = getStepErrors(currentStep);
       setErrors(stepErrors);
     } else {
-      // Only show errors for touched fields
       const stepErrors = getStepErrors(currentStep);
       const filteredErrors: FormErrors = {};
-
       Object.keys(stepErrors).forEach((field) => {
         if (touchedFields.has(field)) {
           filteredErrors[field] = stepErrors[field];
         }
       });
-
       setErrors(filteredErrors);
     }
   }, [formData, currentStep, touchedFields, hasAttemptedSubmit]);
@@ -126,13 +128,13 @@ const MultiStepForm: React.FC = () => {
 
     if (Object.keys(stepErrors).length === 0) {
       setCurrentStep((prev) => prev + 1);
-      setHasAttemptedSubmit(false); // Reset for next step
+      setHasAttemptedSubmit(false);
     }
   };
 
   const handlePrevious = () => {
     setCurrentStep((prev) => prev - 1);
-    setHasAttemptedSubmit(false); // Reset when going back
+    setHasAttemptedSubmit(false);
   };
 
   const handleSubmit = async () => {
@@ -143,12 +145,9 @@ const MultiStepForm: React.FC = () => {
     if (Object.keys(stepErrors).length > 0) return;
 
     setIsSubmitting(true);
-
     try {
       await generatePDF(formData);
       setIsSuccess(true);
-
-      // Reset success state after 3 seconds
       setTimeout(() => {
         setIsSuccess(false);
       }, 3000);
@@ -201,7 +200,6 @@ const MultiStepForm: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 py-8 px-4">
       <div className="max-w-4xl mx-auto">
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-          {/* Header */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-8">
             <div className="flex items-center gap-3 mb-4">
               <FileText className="w-8 h-8" />
@@ -213,10 +211,8 @@ const MultiStepForm: React.FC = () => {
             </p>
           </div>
 
-          {/* Form Content */}
           <div className="p-8">
             {renderStep()}
-
             <StepNavigation
               currentStep={currentStep}
               totalSteps={3}
