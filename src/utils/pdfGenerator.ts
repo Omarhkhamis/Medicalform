@@ -1,29 +1,31 @@
 // src/utils/pdfGenerator.ts
-import pdfMake from 'pdfmake/build/pdfmake';
+import pdfMake from "pdfmake/build/pdfmake";
 
 // Fonts (Roboto only)
-import robotoRegularUrl from '../fonts/Roboto-Regular.ttf?url';
-import robotoBoldUrl from '../fonts/Roboto-Bold.ttf?url';
+import robotoRegularUrl from "../fonts/Roboto-Regular.ttf?url";
+import robotoBoldUrl from "../fonts/Roboto-Bold.ttf?url";
 
 // Top/Bottom banners — SVG only
-import headerSvgUrl from '../fonts/header.svg?url';
-import footerSvgUrl from '../fonts/footer.svg?url';
+import headerSvgUrl from "../fonts/header.svg?url";
+import footerSvgUrl from "../fonts/footer.svg?url";
 
-import { FormData, ServiceEntry } from '../types/form';
+import { FormData, ServiceEntry } from "../types/form";
 
 /* ========= config ========= */
-const SQUARE_SIDE = 220;      // حجم الصور المربعة في الجاليري
-const HEADER_IMG_H = 70;      // اضبطها حسب ارتفاع الـ header.svg
-const FOOTER_IMG_H = 90;      // اضبطها حسب ارتفاع الـ footer.svg
+const SQUARE_SIDE = 220; // حجم الصور المربعة في الجاليري
+const HEADER_IMG_H = 70; // اضبطها حسب ارتفاع الـ header.svg
+const FOOTER_IMG_H = 90; // اضبطها حسب ارتفاع الـ footer.svg
 
 /* ========= helpers ========= */
-const isEmpty = (v?: string | number | '') => v === '' || v === undefined || v === null;
-const asText = (v?: string | number | '') => (isEmpty(v) ? '-' : String(v));
+const isEmpty = (v?: string | number | "") =>
+  v === "" || v === undefined || v === null;
+const asText = (v?: string | number | "") => (isEmpty(v) ? "-" : String(v));
 
 function toBase64(buffer: ArrayBuffer): string {
-  let binary = '';
+  let binary = "";
   const bytes = new Uint8Array(buffer);
-  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+  for (let i = 0; i < bytes.byteLength; i++)
+    binary += String.fromCharCode(bytes[i]);
   return btoa(binary);
 }
 
@@ -32,7 +34,9 @@ async function fetchAsBase64(url: string): Promise<string | null> {
     const res = await fetch(url);
     if (!res.ok) return null;
     return toBase64(await res.arrayBuffer());
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 async function fetchAsText(url: string): Promise<string | null> {
@@ -40,7 +44,9 @@ async function fetchAsText(url: string): Promise<string | null> {
     const res = await fetch(url);
     if (!res.ok) return null;
     return await res.text();
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 const fileToDataURL = (f: File) =>
@@ -57,21 +63,31 @@ function toSquareDataURL(src: string, side = SQUARE_SIDE): Promise<string> {
     const img = new Image();
     img.onload = () => {
       try {
-        const canvas = document.createElement('canvas');
-        canvas.width = side; canvas.height = side;
-        const ctx = canvas.getContext('2d');
+        const canvas = document.createElement("canvas");
+        canvas.width = side;
+        canvas.height = side;
+        const ctx = canvas.getContext("2d");
         if (!ctx) return resolve(src);
 
         const ratio = img.width / img.height;
-        let sx = 0, sy = 0, sw = img.width, sh = img.height;
-        if (ratio > 1) { // أوسع من المطلوب -> نقص من العرض
-          sh = img.height; sw = sh; sx = (img.width - sw) / 2;
-        } else if (ratio < 1) { // أطول من المطلوب -> نقص من الارتفاع
-          sw = img.width; sh = sw; sy = (img.height - sh) / 2;
+        let sx = 0,
+          sy = 0,
+          sw = img.width,
+          sh = img.height;
+        if (ratio > 1) {
+          sh = img.height;
+          sw = sh;
+          sx = (img.width - sw) / 2;
+        } else if (ratio < 1) {
+          sw = img.width;
+          sh = sw;
+          sy = (img.height - sh) / 2;
         }
         ctx.drawImage(img, sx, sy, sw, sh, 0, 0, side, side);
-        resolve(canvas.toDataURL('image/png'));
-      } catch { resolve(src); }
+        resolve(canvas.toDataURL("image/png"));
+      } catch {
+        resolve(src);
+      }
     };
     img.onerror = reject;
     img.src = src;
@@ -86,26 +102,29 @@ let assetsReady: Promise<void> | null = null;
 async function ensureAssets(): Promise<void> {
   if (!assetsReady) {
     assetsReady = (async () => {
-      const pm = pdfMake as unknown as { vfs?: Record<string, string>; fonts?: any };
+      const pm = pdfMake as unknown as {
+        vfs?: Record<string, string>;
+        fonts?: any;
+      };
       if (!pm.vfs) pm.vfs = {};
 
-      // Roboto
-      const RREG = 'Roboto-Regular.ttf';
-      const RBLD = 'Roboto-Bold.ttf';
+      const RREG = "Roboto-Regular.ttf";
+      const RBLD = "Roboto-Bold.ttf";
       if (!pm.vfs[RREG]) {
         const b64 = await fetchAsBase64(robotoRegularUrl);
-        if (!b64) throw new Error('Failed to load Roboto-Regular.ttf');
+        if (!b64) throw new Error("Failed to load Roboto-Regular.ttf");
         pm.vfs[RREG] = b64;
       }
       if (!pm.vfs[RBLD]) {
         const b64 = await fetchAsBase64(robotoBoldUrl);
-        if (!b64) throw new Error('Failed to load Roboto-Bold.ttf');
+        if (!b64) throw new Error("Failed to load Roboto-Bold.ttf");
         pm.vfs[RBLD] = b64;
       }
 
-      // SVG banners
-      if (headerSvgText == null) headerSvgText = await fetchAsText(headerSvgUrl);
-      if (footerSvgText == null) footerSvgText = await fetchAsText(footerSvgUrl);
+      if (headerSvgText == null)
+        headerSvgText = await fetchAsText(headerSvgUrl);
+      if (footerSvgText == null)
+        footerSvgText = await fetchAsText(footerSvgUrl);
 
       (pdfMake as any).fonts = {
         Roboto: { normal: RREG, bold: RBLD, italics: RREG, bolditalics: RBLD },
@@ -116,55 +135,130 @@ async function ensureAssets(): Promise<void> {
 }
 
 /* ========= common utils ========= */
-function n(v: number | '' | undefined) { return typeof v === 'number' ? v : Number(v || 0); }
-function lineTotal(s: ServiceEntry) { return n(s.price) * n(s.quantity); }
-function money(v: number | '' | undefined, currency: string) { return isEmpty(v) ? '-' : `${v} ${currency}`; }
+function n(v: number | "" | undefined) {
+  return typeof v === "number" ? v : Number(v || 0);
+}
+function lineTotal(s: ServiceEntry) {
+  return n(s.price) * n(s.quantity);
+}
+function money(v: number | "" | undefined, currency: string) {
+  return isEmpty(v) ? "-" : `${v} ${currency}`;
+}
 
 /* ========= table layout ========= */
 function softBoxLayout() {
   return {
-    hLineColor: () => '#cfd8dc',
-    vLineColor: () => '#cfd8dc',
+    hLineColor: () => "#cfd8dc",
+    vLineColor: () => "#cfd8dc",
     hLineWidth: (i: number) => (i === 1 ? 1.2 : 0.6),
     vLineWidth: () => 0.6,
-    paddingLeft: () => 6, paddingRight: () => 6,
-    paddingTop: () => 6, paddingBottom: () => 6,
-    fillColor: (rowIndex: number) => (rowIndex === 0 ? '#eef6ff' : '#fafafa'),
+    paddingLeft: () => 6,
+    paddingRight: () => 6,
+    paddingTop: () => 6,
+    paddingBottom: () => 6,
+    fillColor: (rowIndex: number) => (rowIndex === 0 ? "#eef6ff" : "#fafafa"),
   };
 }
 
-const Label = (t: string) => ({ text: t, style: 'label' });
-const Val   = (v: string | number | '') =>
-  isEmpty(v) ? ({ text: '-', style: 'placeholder' }) :
-               ({ text: String(v), style: 'value' });
+const Label = (t: string) => ({ text: t, style: "label" });
+const Val = (v: string | number | "") =>
+  isEmpty(v)
+    ? { text: "-", style: "placeholder" }
+    : { text: String(v), style: "value" };
 
 /* ========= sections ========= */
 function PersonalInfoBox(data: FormData) {
   return {
     margin: [0, 6, 0, 10],
     table: {
-      widths: ['*', '*'],
+      widths: ["*", "*"],
       body: [
-        [{ text: 'Personal Information', style: 'boxTitle', colSpan: 2 }, {}],
+        [{ text: "Personal Information", style: "boxTitle", colSpan: 2 }, {}],
         [
-          { columns: [Label('Consultant Name'), { text: ': ', width: 6 }, Val(data.consultantName)], columnGap: 4 },
-          { columns: [Label('Age'),             { text: ': ', width: 6 }, Val(data.age)], columnGap: 4 },
+          {
+            columns: [
+              Label("Consultant Name"),
+              { text: ": ", width: 6 },
+              Val(data.consultantName),
+            ],
+            columnGap: 4,
+          },
+          {
+            columns: [Label("Age"), { text: ": ", width: 6 }, Val(data.age)],
+            columnGap: 4,
+          },
         ],
         [
-          { columns: [Label('Patient Name'), { text: ': ', width: 6 }, Val(data.patientName)], columnGap: 4 },
-          { columns: [Label('Currency'),     { text: ': ', width: 6 }, Val(data.currency)], columnGap: 4 },
+          {
+            columns: [
+              Label("Patient Name"),
+              { text: ": ", width: 6 },
+              Val(data.patientName),
+            ],
+            columnGap: 4,
+          },
+          {
+            columns: [
+              Label("Currency"),
+              { text: ": ", width: 6 },
+              Val(data.currency),
+            ],
+            columnGap: 4,
+          },
         ],
         [
-          { columns: [Label('Phone Number'), { text: ': ', width: 6 }, Val(data.phoneNumber)], columnGap: 4 },
-          { columns: [Label('Language'),     { text: ': ', width: 6 }, Val(data.language)], columnGap: 4 },
+          {
+            columns: [
+              Label("Phone Number"),
+              { text: ": ", width: 6 },
+              Val(data.phoneNumber),
+            ],
+            columnGap: 4,
+          },
+          {
+            columns: [
+              Label("Language"),
+              { text: ": ", width: 6 },
+              Val(data.language),
+            ],
+            columnGap: 4,
+          },
         ],
         [
-          { columns: [Label('Patient ID'),       { text: ': ', width: 6 }, Val(data.patientId)], columnGap: 4 },
-          { columns: [Label('Health Condition'), { text: ': ', width: 6 }, Val(data.healthCondition)], columnGap: 4 },
+          {
+            columns: [
+              Label("Patient ID"),
+              { text: ": ", width: 6 },
+              Val(data.patientId),
+            ],
+            columnGap: 4,
+          },
+          {
+            columns: [
+              Label("Health Condition"),
+              { text: ": ", width: 6 },
+              Val(data.healthCondition),
+            ],
+            columnGap: 4,
+          },
         ],
         [
-          { columns: [Label('Entry Date'), { text: ': ', width: 6 }, Val(data.entryDate)], columnGap: 4 },
-          { columns: [Label('Services'),   { text: ': ', width: 6 }, Val(data.services)], columnGap: 4 },
+          {
+            columns: [
+              Label("Entry Date"),
+              { text: ": ", width: 6 },
+              Val(data.entryDate),
+            ],
+            columnGap: 4,
+          },
+          {
+            columns: [
+              Label("Services"),
+              { text: ": ", width: 6 },
+              Val(data.services),
+            ],
+            columnGap: 4,
+          },
         ],
       ],
     },
@@ -172,16 +266,22 @@ function PersonalInfoBox(data: FormData) {
   };
 }
 
-function VisitInfoBox(title: string, date: string, days: number | '') {
+function VisitInfoBox(title: string, date: string, days: number | "") {
   return {
     margin: [0, 6, 0, 8],
     table: {
-      widths: ['*', '*'],
+      widths: ["*", "*"],
       body: [
-        [{ text: title, style: 'boxTitle', colSpan: 2 }, {}],
+        [{ text: title, style: "boxTitle", colSpan: 2 }, {}],
         [
-          { columns: [Label('Visit Date'), { text: ': ', width: 6 }, Val(date)], columnGap: 4 },
-          { columns: [Label('Visit Days'), { text: ': ', width: 6 }, Val(days)], columnGap: 4 },
+          {
+            columns: [Label("Visit Date"), { text: ": ", width: 6 }, Val(date)],
+            columnGap: 4,
+          },
+          {
+            columns: [Label("Visit Days"), { text: ": ", width: 6 }, Val(days)],
+            columnGap: 4,
+          },
         ],
       ],
     },
@@ -191,26 +291,35 @@ function VisitInfoBox(title: string, date: string, days: number | '') {
 
 function ServicesBox(title: string, entries: ServiceEntry[], currency: string) {
   const header = [
-    { text: 'Service Name', style: 'tableHeader', alignment: 'center' },
-    { text: 'Service Type', style: 'tableHeader', alignment: 'center' },
-    { text: 'Price',        style: 'tableHeader', alignment: 'center' },
-    { text: 'Quantity',     style: 'tableHeader', alignment: 'center' },
-    { text: 'Total',        style: 'tableHeader', alignment: 'center' },
+    { text: "Service Name", style: "tableHeader", alignment: "center" },
+    { text: "Service Type", style: "tableHeader", alignment: "center" },
+    { text: "Price", style: "tableHeader", alignment: "center" },
+    { text: "Quantity", style: "tableHeader", alignment: "center" },
+    { text: "Total", style: "tableHeader", alignment: "center" },
   ];
-  const rows = entries.map((s) => ([
-    { text: asText(s.serviceName), alignment: 'center' },
-    { text: asText(s.serviceType), alignment: 'center' },
-    { text: money(s.price as number, currency), alignment: 'center' },
-    { text: isEmpty(s.quantity) ? '-' : String(s.quantity), alignment: 'center' },
-    { text: (isEmpty(s.price) || isEmpty(s.quantity)) ? '-' : `${lineTotal(s)} ${currency}`, alignment: 'center' },
-  ]));
+  const rows = entries.map((s) => [
+    { text: asText(s.serviceName), alignment: "center" },
+    { text: asText(s.serviceType), alignment: "center" },
+    { text: money(s.price as number, currency), alignment: "center" },
+    {
+      text: isEmpty(s.quantity) ? "-" : String(s.quantity),
+      alignment: "center",
+    },
+    {
+      text:
+        isEmpty(s.price) || isEmpty(s.quantity)
+          ? "-"
+          : `${lineTotal(s)} ${currency}`,
+      alignment: "center",
+    },
+  ]);
 
   return {
     margin: [0, 4, 0, 8],
     table: {
-      widths: ['*', '*', 55, 55, 60],
+      widths: ["*", "*", 55, 55, 60],
       body: [
-        [{ text: title, style: 'boxTitle', colSpan: 5 }, {}, {}, {}, {}],
+        [{ text: title, style: "boxTitle", colSpan: 5 }, {}, {}, {}, {}],
         header,
         ...rows,
       ],
@@ -219,59 +328,37 @@ function ServicesBox(title: string, entries: ServiceEntry[], currency: string) {
   };
 }
 
-// Notes خارج جدول لتتدفق عبر الصفحات
 function NotesBox(text: string) {
   const s = asText(text);
-  if (!s || s === '-') return { text: '' };
+  if (!s || s === "-") return { text: "" };
   return {
     margin: [0, 8, 0, 8],
     stack: [
-      { text: 'General Notes', style: 'boxTitle', margin: [0, 0, 0, 4] },
-      { text: s, style: 'value' },
+      { text: "General Notes", style: "boxTitle", margin: [0, 0, 0, 4] },
+      { text: s, style: "value" },
     ],
   };
 }
 
 function AboutClinicBox() {
   const aboutText =
-    'At DENTAL CLINIC, we are committed to providing the highest standards of quality, expertise, and healthcare, delivered by the most experienced medical and administrative staff. We offer cosmetic medical services by a team of the best doctors in the field of aesthetic medicine in Turkey.';
+    "At DENTAL CLINIC, we are committed to providing the highest standards...";
   return {
     margin: [0, 6, 0, 0],
     table: {
-      widths: ['*'],
+      widths: ["*"],
       body: [
-        [{ text: 'About the Clinic', style: 'boxTitle' }],
-        [{ text: aboutText, style: 'value', alignment: 'left' }],
+        [{ text: "About the Clinic", style: "boxTitle" }],
+        [{ text: aboutText, style: "value", alignment: "left" }],
       ],
     },
     layout: softBoxLayout(),
   };
 }
 
-/* ========= PAGE 2: External Link + Images grid ========= */
-function ExternalLinkBox(url?: string) {
-  const link = asText(url);
-  return {
-    margin: [0, 6, 0, 10],
-    table: {
-      widths: ['*'],
-      body: [
-        [{ text: 'External Link', style: 'boxTitle' }],
-        [{
-          text: link,
-          link: /^https?:\/\//i.test(link) ? link : undefined,
-          color: '#1a73e8',
-          decoration: 'underline',
-          fontSize: 10,
-        }],
-      ],
-    },
-    layout: softBoxLayout(),
-  };
-}
-
+/* ========= Images grid ========= */
 function ImagesGrid(squareDataUrls: string[]) {
-  if (!squareDataUrls || squareDataUrls.length === 0) return { text: '' };
+  if (!squareDataUrls || squareDataUrls.length === 0) return { text: "" };
   const rows: any[] = [];
   for (let i = 0; i < squareDataUrls.length; i += 2) {
     const row: any[] = squareDataUrls.slice(i, i + 2).map((src) => ({
@@ -279,31 +366,46 @@ function ImagesGrid(squareDataUrls: string[]) {
       width: SQUARE_SIDE,
       height: SQUARE_SIDE,
       margin: [0, 6, 0, 6],
-      alignment: 'center',
+      alignment: "center",
     }));
-    if (row.length === 1) row.push({ text: ' ' } as any); // مكان فارغ للعمود الثاني
+    if (row.length === 1) row.push({ text: " " } as any);
     rows.push(row);
   }
-  return { margin: [0, 8, 0, 0], table: { widths: ['*', '*'], body: rows }, layout: 'noBorders' as const };
+  return {
+    margin: [0, 8, 0, 0],
+    table: { widths: ["*", "*"], body: rows },
+    layout: "noBorders" as const,
+  };
 }
 
-function GalleryPage(externalLink?: string, squareDataUrls: string[] = []) {
+function GalleryPage(squareDataUrls: string[] = []) {
   return [
-    { text: 'Gallery & Link', style: 'headerEN', margin: [0, 0, 0, 6], alignment: 'center', pageBreak: 'before' },
-    ExternalLinkBox(externalLink),
-    { text: 'Uploaded Images', style: 'boxTitle', margin: [0, 6, 0, 2] },
+    {
+      text: "Uploaded Images",
+      style: "boxTitle",
+      margin: [0, 6, 0, 2],
+      pageBreak: "before",
+    },
     ImagesGrid(squareDataUrls),
   ];
 }
 
-/* ========= خلفية SVG بدل header/footer ========= */
+/* ========= خلفية SVG ========= */
 function pageBackground(_: number, pageSize: any) {
   const elems: any[] = [];
   if (headerSvgText) {
-    elems.push({ svg: headerSvgText, width: pageSize.width, absolutePosition: { x: 0, y: 0 } });
+    elems.push({
+      svg: headerSvgText,
+      width: pageSize.width,
+      absolutePosition: { x: 0, y: 0 },
+    });
   }
   if (footerSvgText) {
-    elems.push({ svg: footerSvgText, width: pageSize.width, absolutePosition: { x: 0, y: pageSize.height - FOOTER_IMG_H } });
+    elems.push({
+      svg: footerSvgText,
+      width: pageSize.width,
+      absolutePosition: { x: 0, y: pageSize.height - FOOTER_IMG_H },
+    });
   }
   return elems;
 }
@@ -313,73 +415,104 @@ export async function generatePDF(formData: FormData): Promise<void> {
   try {
     await ensureAssets();
 
-    // جهّز صور Step3 كمربعات 160×160
-    const uploaded = (formData as any).uploadedImages as File[] | string[] | undefined;
+    const uploaded = (formData as any).uploadedImages as
+      | File[]
+      | string[]
+      | undefined;
     let squareUrls: string[] = [];
     if (uploaded && uploaded.length) {
       const dataUrls = await Promise.all(
-        uploaded.map((it) => (typeof it === 'string' ? Promise.resolve(it) : fileToDataURL(it)))
+        uploaded.map((it) =>
+          typeof it === "string" ? Promise.resolve(it) : fileToDataURL(it)
+        )
       );
-      squareUrls = await Promise.all(dataUrls.map((u) => toSquareDataURL(u, SQUARE_SIDE)));
+      squareUrls = await Promise.all(
+        dataUrls.map((u) => toSquareDataURL(u, SQUARE_SIDE))
+      );
     }
 
-    const currency = formData.currency || '';
-    const t1 = formData.firstVisit.serviceEntries.reduce((s, e) => s + lineTotal(e), 0);
-    const t2 = formData.secondVisit.serviceEntries.reduce((s, e) => s + lineTotal(e), 0);
+    const currency = formData.currency || "";
+    const t1 = formData.firstVisit.serviceEntries.reduce(
+      (s, e) => s + lineTotal(e),
+      0
+    );
+    const t2 = formData.secondVisit.serviceEntries.reduce(
+      (s, e) => s + lineTotal(e),
+      0
+    );
     const all = t1 + t2;
 
     const docDefinition = {
-      pageSize: 'A4',
+      pageSize: "A4",
       pageMargins: [20, HEADER_IMG_H + 16, 20, FOOTER_IMG_H + 16],
       background: pageBackground,
 
       content: [
-        // الصفحة الأولى
-        { text: 'Medical Form Report', style: 'headerEN', alignment: 'center', margin: [0, 0, 0, 6] },
+        {
+          text: "Medical Form Report",
+          style: "headerEN",
+          alignment: "center",
+          margin: [0, 0, 0, 6],
+        },
 
         PersonalInfoBox(formData),
 
-        VisitInfoBox('First Visit Information', formData.firstVisit.visitDate, formData.firstVisit.visitDays),
-        ServicesBox('First Visit Service Entries', formData.firstVisit.serviceEntries, currency),
+        VisitInfoBox(
+          "First Visit Information",
+          formData.firstVisit.visitDate,
+          formData.firstVisit.visitDays
+        ),
+        ServicesBox(
+          "First Visit Service Entries",
+          formData.firstVisit.serviceEntries,
+          currency
+        ),
 
-        VisitInfoBox('Second Visit Information', formData.secondVisit.visitDate, formData.secondVisit.visitDays),
-        ServicesBox('Second Visit Service Entries', formData.secondVisit.serviceEntries, currency),
+        VisitInfoBox(
+          "Second Visit Information",
+          formData.secondVisit.visitDate,
+          formData.secondVisit.visitDays
+        ),
+        ServicesBox(
+          "Second Visit Service Entries",
+          formData.secondVisit.serviceEntries,
+          currency
+        ),
 
         {
           columns: [
-            { text: 'Grand Total', style: 'label', alignment: 'right' },
-            { text: `${all} ${currency}`, style: 'value', alignment: 'right' },
+            { text: "Grand Total", style: "label", alignment: "right" },
+            { text: `${all} ${currency}`, style: "value", alignment: "right" },
           ],
           columnGap: 8,
           margin: [0, 6, 0, 6],
         },
 
-        NotesBox(formData.notes || ''),
+        NotesBox(formData.notes || ""),
         AboutClinicBox(),
 
-        // الصفحة الثانية (تمتد تلقائيًا لصفحات أخرى إذا لزم): الرابط + الصور 160×160
-        ...GalleryPage((formData as any).externalLink, squareUrls),
+        ...GalleryPage(squareUrls),
       ],
 
-      defaultStyle: { font: 'Roboto', fontSize: 9, alignment: 'left' },
+      defaultStyle: { font: "Roboto", fontSize: 9, alignment: "left" },
       styles: {
         headerEN: { fontSize: 16, bold: true },
         boxTitle: { fontSize: 11, bold: true },
-        tableHeader: { bold: true, fillColor: '#e3f2fd' },
+        tableHeader: { bold: true, fillColor: "#e3f2fd" },
         label: { bold: true, fontSize: 9 },
         value: { fontSize: 9 },
-        placeholder: { bold: true, color: '#999', fontSize: 9 },
+        placeholder: { bold: true, color: "#999", fontSize: 9 },
       },
     } as any;
 
     await new Promise<void>((resolve) => {
       (pdfMake as any).createPdf(docDefinition).getBlob((blob: Blob) => {
         const url = URL.createObjectURL(blob);
-        const win = window.open(url, '_blank');
+        const win = window.open(url, "_blank");
         if (!win) {
-          const a = document.createElement('a');
+          const a = document.createElement("a");
           a.href = url;
-          a.download = 'medical-report.pdf';
+          a.download = "medical-report.pdf";
           a.click();
         }
         setTimeout(() => URL.revokeObjectURL(url), 30000);
@@ -387,7 +520,7 @@ export async function generatePDF(formData: FormData): Promise<void> {
       });
     });
   } catch (err) {
-    console.error('PDF generation error:', err);
-    alert('Error generating PDF. Check console for details.');
+    console.error("PDF generation error:", err);
+    alert("Error generating PDF. Check console for details.");
   }
 }

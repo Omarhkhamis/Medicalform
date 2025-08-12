@@ -1,107 +1,124 @@
-import React, { useState } from 'react';
-import { StepProps, ServiceEntry } from '../../types/form';
-import FormInput from '../FormInput';
-import { Plus, X } from 'lucide-react';
+import React, { useMemo, useState } from "react";
+import { StepProps, ServiceEntry } from "../../types/form";
+import FormInput from "../FormInput";
+import { Plus, X } from "lucide-react";
 
-const Step2: React.FC<StepProps> = ({ formData, errors, onChange, onBlur }) => {
+const Step2: React.FC<StepProps> = ({ formData, errors, onChange }) => {
   const [firstVisitEntry, setFirstVisitEntry] = useState({
-    serviceName: '',
-    serviceType: '',
-    price: '' as number | '',
-    quantity: '' as number | ''
+    serviceName: "",
+    serviceType: "",
+    price: "" as number | "",
+    quantity: "" as number | "",
   });
 
   const [secondVisitEntry, setSecondVisitEntry] = useState({
-    serviceName: '',
-    serviceType: '',
-    price: '' as number | '',
-    quantity: '' as number | ''
+    serviceName: "",
+    serviceType: "",
+    price: "" as number | "",
+    quantity: "" as number | "",
   });
 
+  // فعّل الزيارة الثانية تلقائياً إذا فيها بيانات مسبقاً
+  const initiallyEnabled = useMemo(() => {
+    const v = formData.secondVisit;
+    return Boolean(
+      v?.visitDate ||
+        v?.visitDays ||
+        (v?.serviceEntries && v.serviceEntries.length > 0)
+    );
+  }, [formData.secondVisit]);
+
+  const [secondVisitEnabled, setSecondVisitEnabled] =
+    useState<boolean>(initiallyEnabled);
+
   const serviceNameOptions = [
-    { value: 'option1', label: 'Option 1' },
-    { value: 'option2', label: 'Option 2' },
-    { value: 'option3', label: 'Option 3' }
+    { value: "dental_implant", label: "Dental Implant" },
+    { value: "zirconium_crown", label: "Zirconium Crown" },
+    { value: "open_sinus_lift", label: "Open Sinus Lift" },
+    { value: "close_sinus_lift", label: "Close Sinus Lift" },
+    { value: "veneer_lens", label: "Veneer Lens" },
   ];
 
   const handleFirstVisitChange = (field: string, value: string | number) => {
-    if (field === 'visitDate') {
-      const updatedFirstVisit = { ...formData.firstVisit, visitDate: value as string };
-      onChange('firstVisit', updatedFirstVisit as any);
-    } else if (field === 'visitDays') {
-      const updatedFirstVisit = { ...formData.firstVisit, visitDays: value as number };
-      onChange('firstVisit', updatedFirstVisit as any);
-    }
+    const updatedFirstVisit = { ...formData.firstVisit } as any;
+    if (field === "visitDate") updatedFirstVisit.visitDate = value as string;
+    if (field === "visitDays") updatedFirstVisit.visitDays = value as number;
+    onChange("firstVisit", updatedFirstVisit);
   };
 
   const handleSecondVisitChange = (field: string, value: string | number) => {
-    if (field === 'visitDate') {
-      const updatedSecondVisit = { ...formData.secondVisit, visitDate: value as string };
-      onChange('secondVisit', updatedSecondVisit as any);
-    } else if (field === 'visitDays') {
-      const updatedSecondVisit = { ...formData.secondVisit, visitDays: value as number };
-      onChange('secondVisit', updatedSecondVisit as any);
-    }
+    const updatedSecondVisit = { ...formData.secondVisit } as any;
+    if (field === "visitDate") updatedSecondVisit.visitDate = value as string;
+    if (field === "visitDays") updatedSecondVisit.visitDays = value as number;
+    onChange("secondVisit", updatedSecondVisit);
   };
 
-  const handleFirstVisitEntryChange = (field: string, value: string | number) => {
-    setFirstVisitEntry(prev => ({ ...prev, [field]: value }));
+  const handleFirstVisitEntryChange = (
+    field: string,
+    value: string | number
+  ) => {
+    setFirstVisitEntry((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSecondVisitEntryChange = (field: string, value: string | number) => {
-    setSecondVisitEntry(prev => ({ ...prev, [field]: value }));
+  const handleSecondVisitEntryChange = (
+    field: string,
+    value: string | number
+  ) => {
+    setSecondVisitEntry((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleAddFirstVisitEntry = () => {
-    const hasData = firstVisitEntry.serviceName || 
-                   firstVisitEntry.serviceType || 
-                   firstVisitEntry.price !== '' || 
-                   firstVisitEntry.quantity !== '';
+    const hasData =
+      firstVisitEntry.serviceName ||
+      firstVisitEntry.serviceType ||
+      firstVisitEntry.price !== "" ||
+      firstVisitEntry.quantity !== "";
 
     if (hasData) {
       const newEntry: ServiceEntry = {
         id: Date.now().toString(),
-        ...firstVisitEntry
+        ...firstVisitEntry,
       };
 
       const updatedFirstVisit = {
         ...formData.firstVisit,
-        serviceEntries: [...formData.firstVisit.serviceEntries, newEntry]
+        serviceEntries: [...formData.firstVisit.serviceEntries, newEntry],
       };
-      onChange('firstVisit', updatedFirstVisit as any);
+      onChange("firstVisit", updatedFirstVisit as any);
 
       setFirstVisitEntry({
-        serviceName: '',
-        serviceType: '',
-        price: '',
-        quantity: ''
+        serviceName: "",
+        serviceType: "",
+        price: "",
+        quantity: "",
       });
     }
   };
 
   const handleAddSecondVisitEntry = () => {
-    const hasData = secondVisitEntry.serviceName || 
-                   secondVisitEntry.serviceType || 
-                   secondVisitEntry.price !== '' || 
-                   secondVisitEntry.quantity !== '';
+    const hasData =
+      secondVisitEntry.serviceName ||
+      secondVisitEntry.serviceType ||
+      secondVisitEntry.price !== "" ||
+      secondVisitEntry.quantity !== "";
 
     if (hasData) {
       const newEntry: ServiceEntry = {
         id: Date.now().toString(),
-        ...secondVisitEntry
+        ...secondVisitEntry,
       };
 
       const updatedSecondVisit = {
         ...formData.secondVisit,
-        serviceEntries: [...formData.secondVisit.serviceEntries, newEntry]
+        serviceEntries: [...formData.secondVisit.serviceEntries, newEntry],
       };
-      onChange('secondVisit', updatedSecondVisit as any);
+      onChange("secondVisit", updatedSecondVisit as any);
 
       setSecondVisitEntry({
-        serviceName: '',
-        serviceType: '',
-        price: '',
-        quantity: ''
+        serviceName: "",
+        serviceType: "",
+        price: "",
+        quantity: "",
       });
     }
   };
@@ -109,56 +126,72 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange, onBlur }) => {
   const handleRemoveFirstVisitEntry = (id: string) => {
     const updatedFirstVisit = {
       ...formData.firstVisit,
-      serviceEntries: formData.firstVisit.serviceEntries.filter(entry => entry.id !== id)
+      serviceEntries: formData.firstVisit.serviceEntries.filter(
+        (entry) => entry.id !== id
+      ),
     };
-    onChange('firstVisit', updatedFirstVisit as any);
+    onChange("firstVisit", updatedFirstVisit as any);
   };
 
   const handleRemoveSecondVisitEntry = (id: string) => {
     const updatedSecondVisit = {
       ...formData.secondVisit,
-      serviceEntries: formData.secondVisit.serviceEntries.filter(entry => entry.id !== id)
+      serviceEntries: formData.secondVisit.serviceEntries.filter(
+        (entry) => entry.id !== id
+      ),
     };
-    onChange('secondVisit', updatedSecondVisit as any);
+    onChange("secondVisit", updatedSecondVisit as any);
   };
 
-  const formatPrice = (price: number | '', currency: string) => {
-    if (price === '' || price === 0) return '-';
+  const formatPrice = (price: number | "", currency: string) => {
+    if (price === "" || price === 0) return "-";
     return `${price} ${currency}`;
   };
 
   const renderVisitSection = (
     title: string,
-    visitData: { visitDate: string; visitDays: number | ''; serviceEntries: ServiceEntry[] },
-    currentEntry: { serviceName: string; serviceType: string; price: number | ''; quantity: number | '' },
+    visitData: {
+      visitDate: string;
+      visitDays: number | "";
+      serviceEntries: ServiceEntry[];
+    },
+    currentEntry: {
+      serviceName: string;
+      serviceType: string;
+      price: number | "";
+      quantity: number | "";
+    },
     onVisitChange: (field: string, value: string | number) => void,
     onEntryChange: (field: string, value: string | number) => void,
     onAddEntry: () => void,
     onRemoveEntry: (id: string) => void,
     visitDateError?: string,
-    visitDaysError?: string
+    visitDaysError?: string,
+    isRequired: boolean = true
   ) => (
     <div className="space-y-6">
-      <h3 className="text-xl font-semibold text-gray-800 border-b border-gray-200 pb-2">{title}</h3>
-      
+      <h3 className="text-xl font-semibold text-gray-800 border-b border-gray-200 pb-2">
+        {title}
+      </h3>
+
       {/* Visit Information */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <FormInput
           label="Visit Date"
           type="date"
           value={visitData.visitDate}
-          onChange={(value) => onVisitChange('visitDate', value)}
+          onChange={(value) => onVisitChange("visitDate", value)}
           error={visitDateError}
-          required
+          required={isRequired}
         />
 
         <FormInput
           label="Visit Days"
           type="number"
           value={visitData.visitDays}
-          onChange={(value) => onVisitChange('visitDays', value)}
+          onChange={(value) => onVisitChange("visitDays", value)}
           error={visitDaysError}
-          required
+          required={isRequired}
           placeholder="Days until visit"
         />
       </div>
@@ -166,13 +199,13 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange, onBlur }) => {
       {/* Service Entry Form */}
       <div className="bg-gray-50 rounded-lg p-6 space-y-6">
         <h4 className="text-lg font-medium text-gray-800">Add Service Entry</h4>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormInput
             label="Service Name"
             type="select"
             value={currentEntry.serviceName}
-            onChange={(value) => onEntryChange('serviceName', value)}
+            onChange={(value) => onEntryChange("serviceName", value)}
             options={serviceNameOptions}
             placeholder="Select service"
           />
@@ -180,7 +213,7 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange, onBlur }) => {
           <FormInput
             label="Service Type"
             value={currentEntry.serviceType}
-            onChange={(value) => onEntryChange('serviceType', value)}
+            onChange={(value) => onEntryChange("serviceType", value)}
             placeholder="Enter service type"
           />
         </div>
@@ -190,7 +223,7 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange, onBlur }) => {
             label="Price"
             type="number"
             value={currentEntry.price}
-            onChange={(value) => onEntryChange('price', value)}
+            onChange={(value) => onEntryChange("price", value)}
             placeholder="Enter price"
           />
 
@@ -198,7 +231,7 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange, onBlur }) => {
             label="Quantity"
             type="number"
             value={currentEntry.quantity}
-            onChange={(value) => onEntryChange('quantity', value)}
+            onChange={(value) => onEntryChange("quantity", value)}
             placeholder="Enter quantity"
           />
         </div>
@@ -219,7 +252,7 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange, onBlur }) => {
       {visitData.serviceEntries.length > 0 && (
         <div className="space-y-4">
           <h4 className="text-lg font-medium text-gray-800">Service Entries</h4>
-          
+
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
               <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
@@ -233,19 +266,22 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange, onBlur }) => {
 
             <div className="divide-y divide-gray-200">
               {visitData.serviceEntries.map((entry) => (
-                <div key={entry.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
+                <div
+                  key={entry.id}
+                  className="px-6 py-4 hover:bg-gray-50 transition-colors"
+                >
                   <div className="grid grid-cols-12 gap-4 items-center text-sm">
                     <div className="col-span-3 text-gray-900">
-                      {entry.serviceName || '-'}
+                      {entry.serviceName || "-"}
                     </div>
                     <div className="col-span-3 text-gray-900">
-                      {entry.serviceType || '-'}
+                      {entry.serviceType || "-"}
                     </div>
                     <div className="col-span-2 text-gray-900">
                       {formatPrice(entry.price, formData.currency)}
                     </div>
                     <div className="col-span-2 text-gray-900">
-                      {entry.quantity || '-'}
+                      {entry.quantity || "-"}
                     </div>
                     <div className="col-span-2 text-center">
                       <button
@@ -271,16 +307,40 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange, onBlur }) => {
     </div>
   );
 
+  // عند تفعيل/إلغاء تفعيل الزيارة الثانية
+  const toggleSecondVisit = (enabled: boolean) => {
+    setSecondVisitEnabled(enabled);
+    if (!enabled) {
+      // مسح بيانات الزيارة الثانية بالكامل
+      onChange("secondVisit", {
+        visitDate: "",
+        visitDays: "",
+        serviceEntries: [],
+      } as any);
+      // إعادة ضبط نموذج الإدخال المؤقت
+      setSecondVisitEntry({
+        serviceName: "",
+        serviceType: "",
+        price: "",
+        quantity: "",
+      });
+    }
+  };
+
   return (
     <div className="space-y-12">
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">Medical Visits</h2>
-        <p className="text-gray-600">Please provide medical visit details and service information</p>
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">
+          Medical Visits
+        </h2>
+        <p className="text-gray-600">
+          Please provide medical visit details and service information
+        </p>
       </div>
 
-      {/* First Visit Section */}
+      {/* First Visit Section (Required) */}
       {renderVisitSection(
-        'First Visit',
+        "First Visit",
         formData.firstVisit,
         firstVisitEntry,
         handleFirstVisitChange,
@@ -288,21 +348,41 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange, onBlur }) => {
         handleAddFirstVisitEntry,
         handleRemoveFirstVisitEntry,
         errors.firstVisitDate,
-        errors.firstVisitDays
+        errors.firstVisitDays,
+        true // required
       )}
 
-      {/* Second Visit Section */}
-      {renderVisitSection(
-        'Second Visit',
-        formData.secondVisit,
-        secondVisitEntry,
-        handleSecondVisitChange,
-        handleSecondVisitEntryChange,
-        handleAddSecondVisitEntry,
-        handleRemoveSecondVisitEntry,
-        errors.secondVisitDate,
-        errors.secondVisitDays
-      )}
+      {/* Toggle for Second Visit */}
+      <div className="flex items-center gap-3">
+        <input
+          id="enable-second-visit"
+          type="checkbox"
+          checked={secondVisitEnabled}
+          onChange={(e) => toggleSecondVisit(e.target.checked)}
+          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+        />
+        <label
+          htmlFor="enable-second-visit"
+          className="text-sm font-medium text-gray-700 select-none"
+        >
+          Enable Second Visit (optional)
+        </label>
+      </div>
+
+      {/* Second Visit Section (Optional) */}
+      {secondVisitEnabled &&
+        renderVisitSection(
+          "Second Visit",
+          formData.secondVisit,
+          secondVisitEntry,
+          handleSecondVisitChange,
+          handleSecondVisitEntryChange,
+          handleAddSecondVisitEntry,
+          handleRemoveSecondVisitEntry,
+          errors.secondVisitDate,
+          errors.secondVisitDays,
+          false // NOT required
+        )}
     </div>
   );
 };
