@@ -5,16 +5,26 @@ import pdfMake from "pdfmake/build/pdfmake";
 import robotoRegularUrl from "../fonts/Roboto-Regular.ttf?url";
 import robotoBoldUrl from "../fonts/Roboto-Bold.ttf?url";
 
-// Top/Bottom banners — SVG only
+// Top/Bottom banners — SVG only (background)
 import headerSvgUrl from "../fonts/header.svg?url";
 import footerSvgUrl from "../fonts/footer.svg?url";
+
+// Page-content banners (PNG)
+import bannerTopUrl from "../fonts/banner.png?url";
+import bannerBottomUrl from "../fonts/banner1.png?url";
 
 import { FormData, ServiceEntry } from "../types/form";
 
 /* ========= config ========= */
 const SQUARE_SIDE = 220; // حجم الصور المربعة في الجاليري
+// أقصى عدد صور للمعرض في الصفحة الأخيرة
+const GALLERY_MAX = 4;
+// مقاس العرض/الارتفاع عند الرسم داخل PDF (أصغر قليلًا من SQUARE_SIDE ليضمن الملاءمة مع البانر)
+const GALLERY_SIDE = 215;
+
 const HEADER_IMG_H = 70; // اضبطها حسب ارتفاع الـ header.svg
-const FOOTER_IMG_H = 90; // اضبطها حسب ارتفاع الـ footer.svg
+const FOOTER_IMG_H = 120; // اضبطها حسب ارتفاع الـ footer.svg
+const CONTENT_WIDTH = 515; // عرض مساحة المحتوى الافتراضي داخل A4 مع الهوامش
 
 /* ========= options & label mappers ========= */
 const currencyOptions = [
@@ -143,6 +153,10 @@ function toSquareDataURL(src: string, side = SQUARE_SIDE): Promise<string> {
 let headerSvgText: string | null = null;
 let footerSvgText: string | null = null;
 
+// PNG banners (data URLs)
+let bannerTopDataUrl: string | null = null;
+let bannerBottomDataUrl: string | null = null;
+
 let assetsReady: Promise<void> | null = null;
 async function ensureAssets(): Promise<void> {
   if (!assetsReady) {
@@ -167,11 +181,21 @@ async function ensureAssets(): Promise<void> {
         pm.vfs[RBLD] = b64;
       }
 
-      // SVG banners
+      // SVG banners (background)
       if (headerSvgText == null)
         headerSvgText = await fetchAsText(headerSvgUrl);
       if (footerSvgText == null)
         footerSvgText = await fetchAsText(footerSvgUrl);
+
+      // PNG banners (content)
+      if (bannerTopDataUrl == null) {
+        const b64 = await fetchAsBase64(bannerTopUrl);
+        if (b64) bannerTopDataUrl = `data:image/png;base64,${b64}`;
+      }
+      if (bannerBottomDataUrl == null) {
+        const b64 = await fetchAsBase64(bannerBottomUrl);
+        if (b64) bannerBottomDataUrl = `data:image/png;base64,${b64}`;
+      }
 
       (pdfMake as any).fonts = {
         Roboto: { normal: RREG, bold: RBLD, italics: RREG, bolditalics: RBLD },
@@ -429,18 +453,64 @@ function ImagesGrid(squareDataUrls: string[]) {
   };
 }
 
-function GalleryPage(squareDataUrls: string[] = []) {
+/** يجعل العنوان + كل الصور (حتى 4 صور) + البانر السفلي في نفس الصفحة وداخل بلوك واحد */
+function GalleryWithBottomBanner(
+  squareDataUrls: string[],
+  bannerDataUrl?: string | null
+) {
+  // خذ أول 4 صور كحد أقصى
+  const imgs = (squareDataUrls || []).slice(0, GALLERY_MAX);
+  if (!imgs.length) return { text: "" };
+
+  // نبني صفوف 2×2
+  const rows: string[][] = [];
+  for (let i = 0; i < imgs.length; i += 2) {
+    const slice = imgs.slice(i, i + 2);
+    if (slice.length === 1) slice.push(""); // نكمل عمودين
+    rows.push(slice as [string, string]);
+  }
+
+  // مولّد صف جدول
+  const rowTable = (row: string[]) => ({
+    table: {
+      widths: ["*", "*"],
+      body: [
+        row.map((src) =>
+          src
+            ? {
+                image: src,
+                width: GALLERY_SIDE,
+                height: GALLERY_SIDE,
+                margin: [0, 4, 0, 4],
+                alignment: "center",
+              }
+            : { text: " " }
+        ),
+      ],
+    },
+    layout: "noBorders",
+    margin: [0, 0, 0, 0],
+  });
+
+  // العنوان + كل الصفوف + البانر = بلوك واحد غير قابل للتجزئة
+  const stack: any[] = [
+    { text: "Uploaded Images", style: "boxTitle", margin: [0, 6, 0, 6] },
+    ...rows.map(rowTable),
+  ];
+
+  if (bannerDataUrl) {
+    stack.push({
+      image: bannerDataUrl,
+      width: CONTENT_WIDTH,
+      alignment: "center",
+      margin: [0, 10, 0, 0],
+    });
+  }
+
   return {
-    unbreakable: true, // يحافظ على العنوان والصور معاً
     margin: [0, 8, 0, 0],
-    stack: [
-      {
-        text: "Uploaded Images",
-        style: "boxTitle",
-        margin: [0, 6, 0, 2],
-      },
-      ImagesGrid(squareDataUrls),
-    ],
+    unbreakable: true, // يجبر الكتلة كلها أن تنتقل كاملة لصفحة جديدة إذا لم تتسع
+    stack,
   };
 }
 
@@ -535,9 +605,24 @@ export async function generatePDF(formData: FormData): Promise<void> {
           margin: [0, 0, 0, 6],
         },
 
+        // ✅ بانر علوي كمحتوى منفصل في الصفحة الأولى فقط
+        ...(bannerTopDataUrl
+          ? [
+              {
+                image: bannerTopDataUrl,
+                width: CONTENT_WIDTH,
+                alignment: "center",
+                margin: [0, 6, 0, 10],
+              },
+            ]
+          : []),
+
         PersonalInfoBox(formData),
 
-        // First visit
+        // ✅ ابدأ First Visit من الصفحة الثانية
+        { text: "", pageBreak: "before" },
+
+        // First visit (صفحة 2)
         VisitInfoBox(
           "First Visit Information",
           formData.firstVisit.visitDate,
@@ -574,7 +659,7 @@ export async function generatePDF(formData: FormData): Promise<void> {
           margin: [0, 6, 0, 6],
         },
 
-        // === New boxes instead of General Notes ===
+        // صناديق ملاحظات/خطة العلاج
         DocNoteBox(
           "Medical Treatment Plan",
           (formData as any).medicalTreatmentPlan
@@ -585,7 +670,7 @@ export async function generatePDF(formData: FormData): Promise<void> {
               type: "line",
               x1: 0,
               y1: 0,
-              x2: 515,
+              x2: CONTENT_WIDTH,
               y2: 0,
               lineWidth: 0.5,
               lineColor: "#ccc",
@@ -593,12 +678,12 @@ export async function generatePDF(formData: FormData): Promise<void> {
           ],
           margin: [0, 4, 0, 4],
         },
-
         DocNoteBox("Medical Notes", (formData as any).medicalNotes),
 
         AboutClinicBox(),
 
-        GalleryPage(squareUrls),
+        // ✅ المعرض + العنوان + البانر السفلي كبلوك واحد (في الصفحة الأخيرة لأنه آخر المحتوى)
+        GalleryWithBottomBanner(squareUrls, bannerBottomDataUrl),
       ],
 
       defaultStyle: { font: "Roboto", fontSize: 9, alignment: "left" },
