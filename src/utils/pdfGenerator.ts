@@ -430,14 +430,21 @@ function ImagesGrid(squareDataUrls: string[]) {
 }
 
 function GalleryPage(squareDataUrls: string[] = []) {
-  return [
-    {
-      text: "Uploaded Images",
-      style: "boxTitle",
-      margin: [0, 6, 0, 2],
-    },
-    ImagesGrid(squareDataUrls),
-  ];
+  if (!squareDataUrls || squareDataUrls.length === 0) return { text: "" };
+
+  return {
+    // كتلة واحدة: إذا لم تتّسع نهاية الصفحة تُنقل كاملة للصفحة التالية
+    unbreakable: true,
+    margin: [0, 8, 0, 0],
+    stack: [
+      {
+        text: "Uploaded Images",
+        style: "boxTitle",
+        margin: [0, 6, 0, 2],
+      },
+      ImagesGrid(squareDataUrls),
+    ],
+  };
 }
 
 /* ========= خلفية SVG بدل header/footer ========= */
@@ -594,7 +601,6 @@ export async function generatePDF(formData: FormData): Promise<void> {
 
         AboutClinicBox(),
 
-        // الصفحة الثانية (تمتد تلقائيًا): الصور فقط
         ...GalleryPage(squareUrls),
       ],
 
