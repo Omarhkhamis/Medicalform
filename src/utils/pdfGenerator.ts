@@ -58,6 +58,8 @@ const servicesOptionsAll = [
   { value: "open_sinus_lift", label: "Open Sinus Lift" },
   { value: "close_sinus_lift", label: "Close Sinus Lift" },
   { value: "veneer_lens", label: "Veneer Lens" },
+  { value: "hotel_accommodation", label: "Hotel Accommodation" },
+  { value: "transport", label: "Transport" },
 ];
 
 function mapLabel(
