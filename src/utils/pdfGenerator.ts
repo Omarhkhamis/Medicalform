@@ -430,11 +430,8 @@ function ImagesGrid(squareDataUrls: string[]) {
 }
 
 function GalleryPage(squareDataUrls: string[] = []) {
-  if (!squareDataUrls || squareDataUrls.length === 0) return { text: "" };
-
   return {
-    // كتلة واحدة: إذا لم تتّسع نهاية الصفحة تُنقل كاملة للصفحة التالية
-    unbreakable: true,
+    unbreakable: true, // يحافظ على العنوان والصور معاً
     margin: [0, 8, 0, 0],
     stack: [
       {
@@ -601,7 +598,7 @@ export async function generatePDF(formData: FormData): Promise<void> {
 
         AboutClinicBox(),
 
-        ...GalleryPage(squareUrls),
+        GalleryPage(squareUrls),
       ],
 
       defaultStyle: { font: "Roboto", fontSize: 9, alignment: "left" },
