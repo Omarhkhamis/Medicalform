@@ -5,36 +5,37 @@ export interface FormData {
   phoneNumber: string;
   patientId: string;
   entryDate: string;
-  age: number | '';
+  age: number | "";
   currency: string;
   language: string;
   healthCondition: string;
   services: string;
-  
+
   // Step 2: Medical Visit
   firstVisit: {
     visitDate: string;
-    visitDays: number | '';
+    visitDays: number | "";
     serviceEntries: ServiceEntry[];
   };
   secondVisit: {
     visitDate: string;
-    visitDays: number | '';
+    visitDays: number | "";
     serviceEntries: ServiceEntry[];
   };
-  
+
   // Step 3: Notes
   uploadedImages: File[];
   externalLink: string;
-  notes: string;
+  medicalTreatmentPlan?: string;
+  medicalNotes?: string;
 }
 
 export interface ServiceEntry {
   id: string;
   serviceName: string;
   serviceType: string;
-  price: number | '';
-  quantity: number | '';
+  price: number | "";
+  quantity: number | "";
 }
 
 export interface FormErrors {

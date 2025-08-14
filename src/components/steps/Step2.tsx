@@ -113,6 +113,8 @@ const Step2: React.FC<StepProps> = ({ formData, errors, onChange }) => {
     { value: "open_sinus_lift", label: "Open Sinus Lift" },
     { value: "close_sinus_lift", label: "Close Sinus Lift" },
     { value: "veneer_lens", label: "Veneer Lens" },
+    { value: "hotel_accommodation", label: "Hotel Accommodation" },
+    { value: "transfer", label: "Transfer" },
   ];
 
   const handleFirstVisitChange = (field: string, value: string | number) => {

@@ -3,39 +3,80 @@ import { StepProps } from "../../types/form";
 import FormInput from "../FormInput";
 import { Upload, X, Image } from "lucide-react";
 
+const MAX_IMAGES = 4;
+
 const Step3: React.FC<StepProps> = ({ formData, errors, onChange, onBlur }) => {
   const handleImagesUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
-    if (files) {
-      // Validate file type
-      const allowedTypes = ["image/jpeg", "image/jpg", "image/png"];
-      const validFiles: File[] = [];
+    if (!files) return;
 
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        if (allowedTypes.includes(file.type)) {
-          validFiles.push(file);
-        }
-      }
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png"];
+    const validFiles: File[] = [];
 
-      if (validFiles.length > 0) {
-        onChange("uploadedImages", [...formData.uploadedImages, ...validFiles]);
-      }
+    // المتاح المتبقي قبل الوصول للحد الأقصى
+    const remainingSlots = Math.max(
+      0,
+      MAX_IMAGES - (formData.uploadedImages?.length || 0)
+    );
 
-      if (validFiles.length !== files.length) {
-        alert(
-          "Some files were skipped. Please select only JPG, JPEG, or PNG files."
-        );
-      }
-
+    // لا تسمح بإضافة أي شيء إذا لا توجد مساحة
+    if (remainingSlots === 0) {
+      alert(`You can upload up to ${MAX_IMAGES} images only.`);
       event.target.value = "";
+      return;
     }
+
+    // اجمع فقط الملفات المسموحة وبحد أقصى لما تبقّى
+    for (
+      let i = 0;
+      i < files.length && validFiles.length < remainingSlots;
+      i++
+    ) {
+      const file = files[i];
+      if (allowedTypes.includes(file.type)) validFiles.push(file);
+    }
+
+    if (validFiles.length > 0) {
+      onChange("uploadedImages", [
+        ...(formData.uploadedImages || []),
+        ...validFiles,
+      ]);
+    }
+
+    // رسائل تنبيه عند تخطي النوع أو عند تجاوز الحد
+    const skippedByType = Array.from(files).filter(
+      (f) => !allowedTypes.includes(f.type)
+    ).length;
+    const skippedByLimit = Math.max(
+      0,
+      files.length - validFiles.length - skippedByType
+    );
+
+    if (skippedByType > 0) {
+      alert(
+        "Some files were skipped. Please select only JPG, JPEG, or PNG files."
+      );
+    }
+    if (skippedByLimit > 0) {
+      alert(
+        `Only ${remainingSlots} more image(s) allowed (max ${MAX_IMAGES}).`
+      );
+    }
+
+    // السماح برفع نفس الملف مرة لاحقًا
+    event.target.value = "";
   };
 
   const handleRemoveImage = (index: number) => {
-    const updatedImages = formData.uploadedImages.filter((_, i) => i !== index);
+    const updatedImages = (formData.uploadedImages || []).filter(
+      (_, i) => i !== index
+    );
     onChange("uploadedImages", updatedImages);
   };
+
+  const uploadedCount = formData.uploadedImages?.length || 0;
+  const remaining = Math.max(0, MAX_IMAGES - uploadedCount);
+  const uploadDisabled = uploadedCount >= MAX_IMAGES;
 
   return (
     <div className="space-y-8">
@@ -50,11 +91,23 @@ const Step3: React.FC<StepProps> = ({ formData, errors, onChange, onBlur }) => {
 
       {/* Multiple Images Upload Section */}
       <div className="space-y-4">
-        <label className="block text-sm font-semibold text-gray-700">
-          Upload Images
-        </label>
+        <div className="flex items-baseline justify-between gap-4">
+          <label className="block text-sm font-semibold text-gray-700">
+            Upload Images
+          </label>
+          <span className="text-xs text-gray-500">
+            {uploadedCount}/{MAX_IMAGES} uploaded
+            {remaining > 0 ? ` · ${remaining} remaining` : " · limit reached"}
+          </span>
+        </div>
 
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors">
+        <div
+          className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+            uploadDisabled
+              ? "border-gray-200 bg-gray-50 cursor-not-allowed opacity-75"
+              : "border-gray-300 hover:border-gray-400"
+          }`}
+        >
           <input
             type="file"
             accept="image/jpeg,image/jpg,image/png"
@@ -62,60 +115,66 @@ const Step3: React.FC<StepProps> = ({ formData, errors, onChange, onBlur }) => {
             multiple
             className="hidden"
             id="images-upload"
+            disabled={uploadDisabled}
           />
           <label
             htmlFor="images-upload"
-            className="cursor-pointer flex flex-col items-center gap-4"
+            className={`flex flex-col items-center gap-4 ${
+              uploadDisabled ? "pointer-events-none" : "cursor-pointer"
+            }`}
           >
             <Upload className="w-12 h-12 text-gray-400" />
             <div>
               <p className="text-lg font-medium text-gray-700">
-                Click to upload images
+                {uploadDisabled
+                  ? "Upload limit reached"
+                  : "Click to upload images"}
               </p>
               <p className="text-sm text-gray-500">
-                JPG, JPEG, or PNG files only (multiple selection allowed)
+                JPG, JPEG, or PNG files only (max {MAX_IMAGES})
               </p>
             </div>
           </label>
         </div>
 
         {/* Images Preview */}
-        {formData.uploadedImages.length > 0 && (
+        {uploadedCount > 0 && (
           <div className="space-y-4">
             <h4 className="text-lg font-medium text-gray-800">
-              Uploaded Images ({formData.uploadedImages.length})
+              Uploaded Images ({uploadedCount}/{MAX_IMAGES})
             </h4>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {formData.uploadedImages.map((image, index) => (
                 <div
                   key={index}
-                  className="bg-gray-50 rounded-lg p-4 space-y-3"
+                  className="relative bg-gray-50 rounded-lg p-4 space-y-3 border border-gray-200"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Image className="w-5 h-5 text-blue-500" />
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-gray-800 truncate">
-                          {image.name}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {(image.size / 1024 / 1024).toFixed(2)} MB
-                        </p>
-                      </div>
+                  {/* زر الحذف Absolute أعلى يمين البطاقة */}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveImage(index)}
+                    className="absolute top-2 right-2 z-10 flex items-center justify-center w-8 h-8 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-all duration-200"
+                    title="Remove image"
+                    aria-label={`Remove image ${index + 1}`}
+                  >
+                    <X size={16} />
+                  </button>
+
+                  <div className="flex items-center gap-2 pr-10">
+                    <Image className="w-5 h-5 text-blue-500 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-gray-800 truncate">
+                        {image.name}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {(image.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveImage(index)}
-                      className="flex items-center justify-center w-8 h-8 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full transition-all duration-200"
-                      title="Remove image"
-                    >
-                      <X size={16} />
-                    </button>
                   </div>
 
                   {/* Image Preview */}
-                  <div className="mt-3">
+                  <div className="mt-1">
                     <img
                       src={URL.createObjectURL(image)}
                       alt={`Preview ${index + 1}`}
@@ -129,15 +188,26 @@ const Step3: React.FC<StepProps> = ({ formData, errors, onChange, onBlur }) => {
         )}
       </div>
 
-      {/* Notes Section */}
+      {/* New: Medical treatment plan */}
       <FormInput
-        label="General Notes"
+        label="Medical treatment plan"
         type="textarea"
-        value={formData.notes}
-        onChange={(value) => onChange("notes", value)}
-        onBlur={() => onBlur("notes")}
-        error={errors.notes}
-        placeholder="Enter any additional notes, comments, or special instructions..."
+        value={(formData as any).medicalTreatmentPlan || ""}
+        onChange={(value) => onChange("medicalTreatmentPlan", value)}
+        onBlur={() => onBlur("medicalTreatmentPlan")}
+        error={(errors as any).medicalTreatmentPlan}
+        placeholder="Enter the medical treatment plan details..."
+      />
+
+      {/* New: Medical notes */}
+      <FormInput
+        label="Medical notes"
+        type="textarea"
+        value={(formData as any).medicalNotes || ""}
+        onChange={(value) => onChange("medicalNotes", value)}
+        onBlur={() => onBlur("medicalNotes")}
+        error={(errors as any).medicalNotes}
+        placeholder="Enter medical notes and observations..."
       />
     </div>
   );

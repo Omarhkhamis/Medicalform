@@ -378,14 +378,14 @@ function ServicesBox(title: string, entries: ServiceEntry[], currency: string) {
   };
 }
 
-// Notes خارج جدول لتتدفق عبر الصفحات
-function NotesBox(text: string) {
+/* ========= Notes-like boxes (generic) ========= */
+function DocNoteBox(title: string, text?: string) {
   const s = asText(text);
   if (!s || s === "-") return { text: "" };
   return {
     margin: [0, 8, 0, 8],
     stack: [
-      { text: "General Notes", style: "boxTitle", margin: [0, 0, 0, 4] },
+      { text: title, style: "boxTitle", margin: [0, 0, 0, 4] },
       { text: s, style: "value" },
     ],
   };
@@ -435,7 +435,6 @@ function GalleryPage(squareDataUrls: string[] = []) {
       text: "Uploaded Images",
       style: "boxTitle",
       margin: [0, 6, 0, 2],
-      pageBreak: "before",
     },
     ImagesGrid(squareDataUrls),
   ];
@@ -461,6 +460,23 @@ function pageBackground(_: number, pageSize: any) {
   return elems;
 }
 
+/* ========= NEW: check if second visit has any data ========= */
+function hasSecondVisitData(v?: FormData["secondVisit"]): boolean {
+  if (!v) return false;
+  const hasDate = !isEmpty(v.visitDate);
+  const hasDays = !isEmpty(v.visitDays);
+  const hasServices =
+    Array.isArray(v.serviceEntries) &&
+    v.serviceEntries.some(
+      (s) =>
+        !isEmpty(s.serviceName as any) ||
+        !isEmpty(s.serviceType) ||
+        !isEmpty(s.price) ||
+        !isEmpty(s.quantity)
+    );
+  return hasDate || hasDays || hasServices;
+}
+
 /* ========= MAIN ========= */
 export async function generatePDF(formData: FormData): Promise<void> {
   try {
@@ -484,14 +500,21 @@ export async function generatePDF(formData: FormData): Promise<void> {
     }
 
     const currency = formData.currency || "";
-    const t1 = formData.firstVisit.serviceEntries.reduce(
+
+    const t1 = (formData.firstVisit?.serviceEntries || []).reduce(
       (s, e) => s + lineTotal(e),
       0
     );
-    const t2 = formData.secondVisit.serviceEntries.reduce(
-      (s, e) => s + lineTotal(e),
-      0
-    );
+
+    const hasSecond = hasSecondVisitData(formData.secondVisit);
+
+    const t2 = hasSecond
+      ? (formData.secondVisit?.serviceEntries || []).reduce(
+          (s, e) => s + lineTotal(e),
+          0
+        )
+      : 0;
+
     const all = t1 + t2;
 
     const docDefinition = {
@@ -510,6 +533,7 @@ export async function generatePDF(formData: FormData): Promise<void> {
 
         PersonalInfoBox(formData),
 
+        // First visit
         VisitInfoBox(
           "First Visit Information",
           formData.firstVisit.visitDate,
@@ -521,16 +545,21 @@ export async function generatePDF(formData: FormData): Promise<void> {
           currency
         ),
 
-        VisitInfoBox(
-          "Second Visit Information",
-          formData.secondVisit.visitDate,
-          formData.secondVisit.visitDays
-        ),
-        ServicesBox(
-          "Second Visit Service Entries",
-          formData.secondVisit.serviceEntries,
-          currency
-        ),
+        // Second visit (اختياري بالكامل)
+        ...(hasSecond
+          ? [
+              VisitInfoBox(
+                "Second Visit Information",
+                formData.secondVisit!.visitDate,
+                formData.secondVisit!.visitDays
+              ),
+              ServicesBox(
+                "Second Visit Service Entries",
+                formData.secondVisit!.serviceEntries,
+                currency
+              ),
+            ]
+          : []),
 
         {
           columns: [
@@ -541,10 +570,31 @@ export async function generatePDF(formData: FormData): Promise<void> {
           margin: [0, 6, 0, 6],
         },
 
-        NotesBox(formData.notes || ""),
+        // === New boxes instead of General Notes ===
+        DocNoteBox(
+          "Medical Treatment Plan",
+          (formData as any).medicalTreatmentPlan
+        ),
+        {
+          canvas: [
+            {
+              type: "line",
+              x1: 0,
+              y1: 0,
+              x2: 515,
+              y2: 0,
+              lineWidth: 0.5,
+              lineColor: "#ccc",
+            },
+          ],
+          margin: [0, 4, 0, 4],
+        },
+
+        DocNoteBox("Medical Notes", (formData as any).medicalNotes),
+
         AboutClinicBox(),
 
-        // الصفحة الثانية (تمتد تلقائيًا لصفحات أخرى إذا لزم): الصور فقط
+        // الصفحة الثانية (تمتد تلقائيًا): الصور فقط
         ...GalleryPage(squareUrls),
       ],
 
