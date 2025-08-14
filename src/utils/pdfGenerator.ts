@@ -1,6 +1,21 @@
 // src/utils/pdfGenerator.ts
 import pdfMake from "pdfmake/build/pdfmake";
+import type {
+  TDocumentDefinitions,
+  Content,
+  TableCell,
+  TableLayout,
+  StyleDictionary,
+} from "pdfmake/interfaces";
 
+interface BrowserPdfMake {
+  vfs?: Record<string, string>;
+  fonts?: Record<string, unknown>;
+  createPdf: (docDef: TDocumentDefinitions) => {
+    getBlob: (cb: (blob: Blob) => void) => void;
+  };
+}
+type PdfMakeStatic = typeof pdfMake;
 // Fonts (Roboto only)
 import robotoRegularUrl from "../fonts/Roboto-Regular.ttf?url";
 import robotoBoldUrl from "../fonts/Roboto-Bold.ttf?url";
@@ -17,9 +32,7 @@ import { FormData, ServiceEntry } from "../types/form";
 
 /* ========= config ========= */
 const SQUARE_SIDE = 220; // حجم الصور المربعة في الجاليري
-// أقصى عدد صور للمعرض في الصفحة الأخيرة
-const GALLERY_MAX = 4;
-// مقاس العرض/الارتفاع عند الرسم داخل PDF (أصغر قليلًا من SQUARE_SIDE ليضمن الملاءمة مع البانر)
+const GALLERY_MAX = 4; // أقصى عدد صور للمعرض في الصفحة الأخيرة
 const GALLERY_SIDE = 215;
 
 const HEADER_IMG_H = 70; // اضبطها حسب ارتفاع الـ header.svg
@@ -130,12 +143,10 @@ function toSquareDataURL(src: string, side = SQUARE_SIDE): Promise<string> {
           sw = img.width,
           sh = img.height;
         if (ratio > 1) {
-          // أوسع من المطلوب -> نقص من العرض
           sh = img.height;
           sw = sh;
           sx = (img.width - sw) / 2;
         } else if (ratio < 1) {
-          // أطول من المطلوب -> نقص من الارتفاع
           sw = img.width;
           sh = sw;
           sy = (img.height - sh) / 2;
@@ -159,14 +170,17 @@ let footerSvgText: string | null = null;
 let bannerTopDataUrl: string | null = null;
 let bannerBottomDataUrl: string | null = null;
 
+type VfsMap = Record<string, string>;
+type PdfMakeWithVfs = PdfMakeStatic & {
+  vfs?: VfsMap;
+  fonts?: Record<string, unknown>;
+};
+
 let assetsReady: Promise<void> | null = null;
 async function ensureAssets(): Promise<void> {
   if (!assetsReady) {
     assetsReady = (async () => {
-      const pm = pdfMake as unknown as {
-        vfs?: Record<string, string>;
-        fonts?: any;
-      };
+      const pm = pdfMake as unknown as PdfMakeWithVfs;
       if (!pm.vfs) pm.vfs = {};
 
       // Roboto
@@ -199,7 +213,7 @@ async function ensureAssets(): Promise<void> {
         if (b64) bannerBottomDataUrl = `data:image/png;base64,${b64}`;
       }
 
-      (pdfMake as any).fonts = {
+      pm.fonts = {
         Roboto: { normal: RREG, bold: RBLD, italics: RREG, bolditalics: RBLD },
       };
     })();
@@ -219,7 +233,7 @@ function money(v: number | "" | undefined, currency: string) {
 }
 
 /* ========= table layout ========= */
-function softBoxLayout() {
+function softBoxLayout(): TableLayout {
   return {
     hLineColor: () => "#cfd8dc",
     vLineColor: () => "#cfd8dc",
@@ -233,20 +247,23 @@ function softBoxLayout() {
   };
 }
 
-const Label = (t: string) => ({ text: t, style: "label" });
-const Val = (v: string | number | "") =>
+const Label = (t: string): Content => ({ text: t, style: "label" });
+const Val = (v: string | number | ""): Content =>
   isEmpty(v)
     ? { text: "-", style: "placeholder" }
     : { text: String(v), style: "value" };
 
 /* ========= sections ========= */
-function PersonalInfoBox(data: FormData) {
+function PersonalInfoBox(data: FormData): Content {
   return {
     margin: [0, 6, 0, 10],
     table: {
       widths: ["*", "*"],
       body: [
-        [{ text: "Personal Information", style: "boxTitle", colSpan: 2 }, {}],
+        [
+          { text: "Personal Information", style: "boxTitle", colSpan: 2 },
+          {} as TableCell,
+        ],
         [
           {
             columns: [
@@ -339,13 +356,13 @@ function PersonalInfoBox(data: FormData) {
   };
 }
 
-function VisitInfoBox(title: string, date: string, days: number | "") {
+function VisitInfoBox(title: string, date: string, days: number | ""): Content {
   return {
     margin: [0, 6, 0, 8],
     table: {
       widths: ["*", "*"],
       body: [
-        [{ text: title, style: "boxTitle", colSpan: 2 }, {}],
+        [{ text: title, style: "boxTitle", colSpan: 2 }, {} as TableCell],
         [
           {
             columns: [Label("Visit Date"), { text: ": ", width: 6 }, Val(date)],
@@ -362,17 +379,23 @@ function VisitInfoBox(title: string, date: string, days: number | "") {
   };
 }
 
-function ServicesBox(title: string, entries: ServiceEntry[], currency: string) {
-  const header = [
+function ServicesBox(
+  title: string,
+  entries: ServiceEntry[],
+  currency: string
+): Content {
+  const header: TableCell[] = [
     { text: "Service Name", style: "tableHeader", alignment: "center" },
     { text: "Service Type", style: "tableHeader", alignment: "center" },
     { text: "Price", style: "tableHeader", alignment: "center" },
     { text: "Quantity", style: "tableHeader", alignment: "center" },
     { text: "Total", style: "tableHeader", alignment: "center" },
   ];
-  const rows = entries.map((s) => [
+  const rows: TableCell[][] = entries.map((s) => [
     {
-      text: asText(mapLabel(servicesOptionsAll, s.serviceName as any)),
+      text: asText(
+        mapLabel(servicesOptionsAll, s.serviceName as string | number | "")
+      ),
       alignment: "center",
     },
     { text: asText(s.serviceType), alignment: "center" },
@@ -395,7 +418,13 @@ function ServicesBox(title: string, entries: ServiceEntry[], currency: string) {
     table: {
       widths: ["*", "*", 55, 55, 60],
       body: [
-        [{ text: title, style: "boxTitle", colSpan: 5 }, {}, {}, {}, {}],
+        [
+          { text: title, style: "boxTitle", colSpan: 5 },
+          {},
+          {},
+          {},
+          {},
+        ] as TableCell[],
         header,
         ...rows,
       ],
@@ -405,7 +434,7 @@ function ServicesBox(title: string, entries: ServiceEntry[], currency: string) {
 }
 
 /* ========= Notes-like boxes (generic) ========= */
-function DocNoteBox(title: string, text?: string) {
+function DocNoteBox(title: string, text?: string): Content {
   const s = asText(text);
   if (!s || s === "-") return { text: "" };
   return {
@@ -417,7 +446,7 @@ function DocNoteBox(title: string, text?: string) {
   };
 }
 
-function AboutClinicBox() {
+function AboutClinicBox(): Content {
   const aboutText =
     "At DENTAL CLINIC, we are committed to providing the highest standards of quality, expertise, and healthcare, delivered by the most experienced medical and administrative staff. We offer cosmetic medical services by a team of the best doctors in the field of aesthetic medicine in Turkey.";
   return {
@@ -433,69 +462,41 @@ function AboutClinicBox() {
   };
 }
 
-/* ========= Images grid ========= */
-function ImagesGrid(squareDataUrls: string[]) {
-  if (!squareDataUrls || squareDataUrls.length === 0) return { text: "" };
-  const rows: any[] = [];
-  for (let i = 0; i < squareDataUrls.length; i += 2) {
-    const row: any[] = squareDataUrls.slice(i, i + 2).map((src) => ({
-      image: src,
-      width: SQUARE_SIDE,
-      height: SQUARE_SIDE,
-      margin: [0, 6, 0, 6],
-      alignment: "center",
-    }));
-    if (row.length === 1) row.push({ text: " " } as any); // مكان فارغ للعمود الثاني
-    rows.push(row);
-  }
-  return {
-    margin: [0, 8, 0, 0],
-    table: { widths: ["*", "*"], body: rows },
-    layout: "noBorders" as const,
-  };
-}
-
 /** يجعل العنوان + كل الصور (حتى 4 صور) + البانر السفلي في نفس الصفحة وداخل بلوك واحد */
 function GalleryWithBottomBanner(
   squareDataUrls: string[],
   bannerDataUrl?: string | null
-) {
-  // خذ أول 4 صور كحد أقصى
+): Content {
   const imgs = (squareDataUrls || []).slice(0, GALLERY_MAX);
   if (!imgs.length) return { text: "" };
 
-  // نبني صفوف 2×2
   const rows: string[][] = [];
   for (let i = 0; i < imgs.length; i += 2) {
     const slice = imgs.slice(i, i + 2);
-    if (slice.length === 1) slice.push(""); // نكمل عمودين
+    if (slice.length === 1) slice.push("");
     rows.push(slice as [string, string]);
   }
 
-  // مولّد صف جدول
-  const rowTable = (row: string[]) => ({
-    table: {
-      widths: ["*", "*"],
-      body: [
-        row.map((src) =>
-          src
-            ? {
-                image: src,
-                width: GALLERY_SIDE,
-                height: GALLERY_SIDE,
-                margin: [0, 4, 0, 4],
-                alignment: "center",
-              }
-            : { text: " " }
-        ),
-      ],
-    },
-    layout: "noBorders",
-    margin: [0, 0, 0, 0],
-  });
+  const rowTable = (row: string[]): Content => {
+    const bodyRow: TableCell[] = row.map((src) =>
+      src
+        ? {
+            image: src,
+            width: GALLERY_SIDE,
+            height: GALLERY_SIDE,
+            margin: [0, 4, 0, 4],
+            alignment: "center",
+          }
+        : { text: " " }
+    );
+    return {
+      table: { widths: ["*", "*"], body: [bodyRow] },
+      layout: "noBorders",
+      margin: [0, 0, 0, 0],
+    };
+  };
 
-  // العنوان + كل الصفوف + البانر = بلوك واحد غير قابل للتجزئة
-  const stack: any[] = [
+  const stack: Content[] = [
     { text: "Uploaded Images", style: "boxTitle", margin: [0, 6, 0, 6] },
     ...rows.map(rowTable),
   ];
@@ -511,27 +512,30 @@ function GalleryWithBottomBanner(
 
   return {
     margin: [0, 8, 0, 0],
-    unbreakable: true, // يجبر الكتلة كلها أن تنتقل كاملة لصفحة جديدة إذا لم تتسع
+    unbreakable: true,
     stack,
   };
 }
 
 /* ========= خلفية SVG بدل header/footer ========= */
-function pageBackground(_: number, pageSize: any) {
-  const elems: any[] = [];
+function pageBackground(
+  _: number,
+  pageSize: { width: number; height: number }
+): Content[] {
+  const elems: Content[] = [];
   if (headerSvgText) {
     elems.push({
       svg: headerSvgText,
       width: pageSize.width,
       absolutePosition: { x: 0, y: 0 },
-    });
+    } as unknown as Content);
   }
   if (footerSvgText) {
     elems.push({
       svg: footerSvgText,
       width: pageSize.width,
       absolutePosition: { x: 0, y: pageSize.height - FOOTER_IMG_H },
-    });
+    } as unknown as Content);
   }
   return elems;
 }
@@ -545,7 +549,7 @@ function hasSecondVisitData(v?: FormData["secondVisit"]): boolean {
     Array.isArray(v.serviceEntries) &&
     v.serviceEntries.some(
       (s) =>
-        !isEmpty(s.serviceName as any) ||
+        !isEmpty(s.serviceName as unknown as string | number | "") ||
         !isEmpty(s.serviceType) ||
         !isEmpty(s.price) ||
         !isEmpty(s.quantity)
@@ -554,15 +558,20 @@ function hasSecondVisitData(v?: FormData["secondVisit"]): boolean {
 }
 
 /* ========= MAIN ========= */
+type Uploadable = File | string;
+interface ExtraFields {
+  uploadedImages?: Uploadable[];
+  medicalTreatmentPlan?: string;
+  medicalNotes?: string;
+}
+
 export async function generatePDF(formData: FormData): Promise<void> {
   try {
     await ensureAssets();
 
     // جهّز صور Step3 كمربعات 220×220 (حسب SQUARE_SIDE)
-    const uploaded = (formData as any).uploadedImages as
-      | File[]
-      | string[]
-      | undefined;
+    const f = formData as FormData & ExtraFields;
+    const uploaded = f.uploadedImages;
     let squareUrls: string[] = [];
     if (uploaded && uploaded.length) {
       const dataUrls = await Promise.all(
@@ -593,7 +602,7 @@ export async function generatePDF(formData: FormData): Promise<void> {
 
     const all = t1 + t2;
 
-    const docDefinition = {
+    const docDefinition: TDocumentDefinitions = {
       pageSize: "A4",
       pageMargins: [20, HEADER_IMG_H + 16, 20, FOOTER_IMG_H + 16],
       background: pageBackground,
@@ -607,7 +616,7 @@ export async function generatePDF(formData: FormData): Promise<void> {
           margin: [0, 0, 0, 6],
         },
 
-        // ✅ بانر علوي كمحتوى منفصل في الصفحة الأولى فقط
+        // بانر علوي كمحتوى منفصل في الصفحة الأولى فقط
         ...(bannerTopDataUrl
           ? [
               {
@@ -615,24 +624,24 @@ export async function generatePDF(formData: FormData): Promise<void> {
                 width: CONTENT_WIDTH,
                 alignment: "center",
                 margin: [0, 6, 0, 10],
-              },
+              } as Content,
             ]
           : []),
 
         PersonalInfoBox(formData),
 
-        // ✅ ابدأ First Visit من الصفحة الثانية
+        // ابدأ First Visit من الصفحة الثانية
         { text: "", pageBreak: "before" },
 
-        // First visit (صفحة 2)
+        // First visit (صفحة 2) — حماية الوصول
         VisitInfoBox(
           "First Visit Information",
-          formData.firstVisit.visitDate,
-          formData.firstVisit.visitDays
+          formData.firstVisit?.visitDate || "",
+          formData.firstVisit?.visitDays ?? ""
         ),
         ServicesBox(
           "First Visit Service Entries",
-          formData.firstVisit.serviceEntries,
+          formData.firstVisit?.serviceEntries || [],
           currency
         ),
 
@@ -641,12 +650,12 @@ export async function generatePDF(formData: FormData): Promise<void> {
           ? [
               VisitInfoBox(
                 "Second Visit Information",
-                formData.secondVisit!.visitDate,
-                formData.secondVisit!.visitDays
+                formData.secondVisit?.visitDate || "",
+                formData.secondVisit?.visitDays ?? ""
               ),
               ServicesBox(
                 "Second Visit Service Entries",
-                formData.secondVisit!.serviceEntries,
+                formData.secondVisit?.serviceEntries || [],
                 currency
               ),
             ]
@@ -662,10 +671,7 @@ export async function generatePDF(formData: FormData): Promise<void> {
         },
 
         // صناديق ملاحظات/خطة العلاج
-        DocNoteBox(
-          "Medical Treatment Plan",
-          (formData as any).medicalTreatmentPlan
-        ),
+        DocNoteBox("Medical Treatment Plan", f.medicalTreatmentPlan),
         {
           canvas: [
             {
@@ -680,11 +686,11 @@ export async function generatePDF(formData: FormData): Promise<void> {
           ],
           margin: [0, 4, 0, 4],
         },
-        DocNoteBox("Medical Notes", (formData as any).medicalNotes),
+        DocNoteBox("Medical Notes", f.medicalNotes),
 
         AboutClinicBox(),
 
-        // ✅ المعرض + العنوان + البانر السفلي كبلوك واحد (في الصفحة الأخيرة لأنه آخر المحتوى)
+        // المعرض + العنوان + البانر السفلي كبلوك واحد
         GalleryWithBottomBanner(squareUrls, bannerBottomDataUrl),
       ],
 
@@ -696,11 +702,12 @@ export async function generatePDF(formData: FormData): Promise<void> {
         label: { bold: true, fontSize: 9 },
         value: { fontSize: 9 },
         placeholder: { bold: true, color: "#999", fontSize: 9 },
-      },
-    } as any;
+      } as StyleDictionary,
+    };
 
+    const pm = pdfMake as unknown as BrowserPdfMake;
     await new Promise<void>((resolve) => {
-      (pdfMake as any).createPdf(docDefinition).getBlob((blob: Blob) => {
+      pm.createPdf(docDefinition).getBlob((blob: Blob) => {
         const url = URL.createObjectURL(blob);
         const win = window.open(url, "_blank");
         if (!win) {
