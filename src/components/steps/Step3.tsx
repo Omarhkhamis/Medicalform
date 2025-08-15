@@ -5,7 +5,41 @@ import { Upload, X, Image } from "lucide-react";
 
 const MAX_IMAGES = 4;
 
-const Step3: React.FC<StepProps> = ({ formData, errors, onChange, onBlur }) => {
+/** تعريفات لأنواع هذه الخطوة */
+type Step3FormData = {
+  uploadedImages?: File[];
+  medicalTreatmentPlan?: string;
+  medicalNotes?: string;
+  // لو عندك حقول إضافية عامة بالـ formData احتفظنا بإمكانية وجودها:
+  [key: string]: unknown;
+};
+
+type Step3Errors = {
+  medicalTreatmentPlan?: string;
+  medicalNotes?: string;
+  [key: string]: string | undefined;
+};
+
+/** نشتق Props خاصة بهذه الخطوة من StepProps مع ضبط الأنواع */
+type Step3Props = Omit<
+  StepProps,
+  "formData" | "errors" | "onChange" | "onBlur"
+> & {
+  formData: Step3FormData;
+  errors: Step3Errors;
+  onChange: <K extends keyof Step3FormData>(
+    field: K,
+    value: Step3FormData[K]
+  ) => void;
+  onBlur: (field: keyof Step3FormData) => void;
+};
+
+const Step3: React.FC<Step3Props> = ({
+  formData,
+  errors,
+  onChange,
+  onBlur,
+}) => {
   const handleImagesUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files) return;
@@ -13,20 +47,15 @@ const Step3: React.FC<StepProps> = ({ formData, errors, onChange, onBlur }) => {
     const allowedTypes = ["image/jpeg", "image/jpg", "image/png"];
     const validFiles: File[] = [];
 
-    // المتاح المتبقي قبل الوصول للحد الأقصى
-    const remainingSlots = Math.max(
-      0,
-      MAX_IMAGES - (formData.uploadedImages?.length || 0)
-    );
+    const current = formData.uploadedImages ?? [];
+    const remainingSlots = Math.max(0, MAX_IMAGES - current.length);
 
-    // لا تسمح بإضافة أي شيء إذا لا توجد مساحة
     if (remainingSlots === 0) {
       alert(`You can upload up to ${MAX_IMAGES} images only.`);
       event.target.value = "";
       return;
     }
 
-    // اجمع فقط الملفات المسموحة وبحد أقصى لما تبقّى
     for (
       let i = 0;
       i < files.length && validFiles.length < remainingSlots;
@@ -37,13 +66,9 @@ const Step3: React.FC<StepProps> = ({ formData, errors, onChange, onBlur }) => {
     }
 
     if (validFiles.length > 0) {
-      onChange("uploadedImages", [
-        ...(formData.uploadedImages || []),
-        ...validFiles,
-      ]);
+      onChange("uploadedImages", [...current, ...validFiles]);
     }
 
-    // رسائل تنبيه عند تخطي النوع أو عند تجاوز الحد
     const skippedByType = Array.from(files).filter(
       (f) => !allowedTypes.includes(f.type)
     ).length;
@@ -63,18 +88,17 @@ const Step3: React.FC<StepProps> = ({ formData, errors, onChange, onBlur }) => {
       );
     }
 
-    // السماح برفع نفس الملف مرة لاحقًا
     event.target.value = "";
   };
 
   const handleRemoveImage = (index: number) => {
-    const updatedImages = (formData.uploadedImages || []).filter(
+    const updatedImages = (formData.uploadedImages ?? []).filter(
       (_, i) => i !== index
     );
     onChange("uploadedImages", updatedImages);
   };
 
-  const uploadedCount = formData.uploadedImages?.length || 0;
+  const uploadedCount = formData.uploadedImages?.length ?? 0;
   const remaining = Math.max(0, MAX_IMAGES - uploadedCount);
   const uploadDisabled = uploadedCount >= MAX_IMAGES;
 
@@ -145,12 +169,11 @@ const Step3: React.FC<StepProps> = ({ formData, errors, onChange, onBlur }) => {
             </h4>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {formData.uploadedImages.map((image, index) => (
+              {(formData.uploadedImages ?? []).map((image, index) => (
                 <div
                   key={index}
                   className="relative bg-gray-50 rounded-lg p-4 space-y-3 border border-gray-200"
                 >
-                  {/* زر الحذف Absolute أعلى يمين البطاقة */}
                   <button
                     type="button"
                     onClick={() => handleRemoveImage(index)}
@@ -173,7 +196,6 @@ const Step3: React.FC<StepProps> = ({ formData, errors, onChange, onBlur }) => {
                     </div>
                   </div>
 
-                  {/* Image Preview */}
                   <div className="mt-1">
                     <img
                       src={URL.createObjectURL(image)}
@@ -187,26 +209,29 @@ const Step3: React.FC<StepProps> = ({ formData, errors, onChange, onBlur }) => {
           </div>
         )}
       </div>
-
-      {/* New: Medical treatment plan */}
+      {/* Medical treatment plan */}
       <FormInput
         label="Medical treatment plan"
         type="textarea"
-        value={(formData as any).medicalTreatmentPlan || ""}
-        onChange={(value) => onChange("medicalTreatmentPlan", value)}
+        value={formData.medicalTreatmentPlan ?? ""}
+        onChange={(value: string | number) =>
+          onChange("medicalTreatmentPlan", String(value))
+        }
         onBlur={() => onBlur("medicalTreatmentPlan")}
-        error={(errors as any).medicalTreatmentPlan}
+        error={errors.medicalTreatmentPlan}
         placeholder="Enter the medical treatment plan details..."
       />
 
-      {/* New: Medical notes */}
+      {/* Medical notes */}
       <FormInput
         label="Medical notes"
         type="textarea"
-        value={(formData as any).medicalNotes || ""}
-        onChange={(value) => onChange("medicalNotes", value)}
+        value={formData.medicalNotes ?? ""}
+        onChange={(value: string | number) =>
+          onChange("medicalNotes", String(value))
+        }
         onBlur={() => onBlur("medicalNotes")}
-        error={(errors as any).medicalNotes}
+        error={errors.medicalNotes}
         placeholder="Enter medical notes and observations..."
       />
     </div>
